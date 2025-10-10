@@ -3,35 +3,27 @@ module.exports = function(RED) {
     RED.nodes.createNode(this, cfg);
     const node = this;
 
-    // interleaved mapping: data/control
     const START_INDEX = Number(cfg.startIndex || 1);
     const STEP        = Number(cfg.step || 2);
 
-    // units
-    const UNITS = (cfg.units === "F") ? "F" : "C";
-
-    // per-channel sensor + optional custom ranges
     const sensors = [];
     const customMin = [];
     const customMax = [];
     for (let i=1; i<=8; i++) {
-      sensors.push(cfg["s"+i] || "NTC10K");
+      sensors.push(cfg["s"+i] || "NTC10K20K");
       const minStr = cfg["s"+i+"min"];
       const maxStr = cfg["s"+i+"max"];
       customMin.push(minStr === "" || minStr === undefined ? null : Number(minStr));
       customMax.push(maxStr === "" || maxStr === undefined ? null : Number(maxStr));
     }
 
-    // default preset ranges in °C
     const presetRangesC = {
-        "NTC10K20K": { minC: -40,  maxC: 125 }, // combined option
-        "PT1000":    { minC: -50,  maxC: 200 },
-        "PT100":     { minC: -200, maxC: 850 }
+      "NTC10K20K": { minC: -40,  maxC: 125 },
+      "PT1000":    { minC: -50,  maxC: 200 },
+      "PT100":     { minC: -200, maxC: 850 }
     };
 
-
-
-    node.status({fill:"grey", shape:"ring", text:`waiting array (start=${START_INDEX}, step=${STEP}, units=${UNITS})`});
+    node.status({fill:"grey", shape:"ring", text:`waiting array (start=${START_INDEX}, step=${STEP})`});
 
     function toSigned16(v) {
       let n = Number(v);
@@ -40,55 +32,45 @@ module.exports = function(RED) {
       if (n > 0x7FFF) n = n - 0x10000;
       return n;
     }
-
     function cToF(c) { return (c * 9/5) + 32; }
 
     function getRangeCForChannel(chIdx) {
-      const sensor = sensors[chIdx] || "NTC10K";
-
-      // If "CUSTOM", must supply custom min/max (fall back to NTC10K if missing)
+      const sensor = sensors[chIdx] || "NTC10K20K";
       if (sensor === "CUSTOM") {
         const minC = (customMin[chIdx] == null ? -40 : customMin[chIdx]);
         const maxC = (customMax[chIdx] == null ? 125  : customMax[chIdx]);
         return { minC, maxC, sensor };
       }
-
-      // Otherwise use preset, but allow optional override if provided
-      const preset = presetRangesC[sensor] || presetRangesC["NTC10K"];
+      const preset = presetRangesC[sensor] || presetRangesC["NTC10K20K"];
       const minC = (customMin[chIdx] == null ? preset.minC : customMin[chIdx]);
       const maxC = (customMax[chIdx] == null ? preset.maxC : customMax[chIdx]);
       return { minC, maxC, sensor };
     }
 
     function convert(rawUnsigned, chIdx) {
-      const rangeC = getRangeCForChannel(chIdx); // includes chosen sensor
-      const sensor = rangeC.sensor;
-      const rawSigned = toSigned16(rawUnsigned); // centi-°C (signed)
+      const rangeC = getRangeCForChannel(chIdx);
+      const rawSigned = toSigned16(rawUnsigned); // centi-°C
       if (!Number.isFinite(rawSigned)) {
         return {
-          temp: null, units: UNITS,
           tempC: null, tempF: null,
           rawUnsigned: Number(rawUnsigned),
           rawSignedCenti: null,
-          sensor,
+          sensor: rangeC.sensor,
           rangeC: { minC: rangeC.minC, maxC: rangeC.maxC },
           rangeF: { minF: Number(cToF(rangeC.minC).toFixed(2)), maxF: Number(cToF(rangeC.maxC).toFixed(2)) },
           state: "invalid"
         };
       }
-
       const tempC = rawSigned / 100.0;
       const tempF = cToF(tempC);
       const state = (tempC < rangeC.minC || tempC > rangeC.maxC) ? "out_of_range" : "ok";
 
       return {
-        temp: UNITS === "F" ? Number(tempF.toFixed(2)) : Number(tempC.toFixed(2)),
-        units: UNITS,
         tempC: Number(tempC.toFixed(2)),
         tempF: Number(tempF.toFixed(2)),
         rawUnsigned: Number(rawUnsigned),
         rawSignedCenti: Number(rawSigned),
-        sensor,
+        sensor: rangeC.sensor,
         rangeC: { minC: rangeC.minC, maxC: rangeC.maxC },
         rangeF: { minF: Number(cToF(rangeC.minC).toFixed(2)), maxF: Number(cToF(rangeC.maxC).toFixed(2)) },
         state
@@ -103,7 +85,6 @@ module.exports = function(RED) {
           const r = getRangeCForChannel(ch);
           outs[ch] = {
             payload: {
-              temp: null, units: UNITS,
               tempC: null, tempF: null,
               rawUnsigned: null, rawSignedCenti: null,
               sensor: r.sensor,
@@ -133,12 +114,12 @@ module.exports = function(RED) {
       try {
         if (Array.isArray(msg.payload)) {
           const outs = arrayToOutputs(msg.payload);
-          node.status({fill:"green", shape:"dot", text:`array → ch 1..8 (${UNITS})`});
+          node.status({fill:"green", shape:"dot", text:`array → ch 1..8`});
           send(outs); return done && done();
         }
         if (msg && msg.payload && Array.isArray(msg.payload.data)) {
           const outs = arrayToOutputs(msg.payload.data);
-          node.status({fill:"green", shape:"dot", text:`data[] → ch 1..8 (${UNITS})`});
+          node.status({fill:"green", shape:"dot", text:`data[] → ch 1..8`});
           send(outs); return done && done();
         }
         if (typeof msg.payload === 'number' && Number.isInteger(msg.index)) {
@@ -146,7 +127,7 @@ module.exports = function(RED) {
           const outs = new Array(8).fill(null);
           if (ch >= 0) {
             outs[ch] = { payload: convert(msg.payload, ch), index: Number(msg.index), channel: ch+1 };
-            node.status({fill:"green", shape:"dot", text:`single → ch ${ch+1} (${UNITS})`});
+            node.status({fill:"green", shape:"dot", text:`single → ch ${ch+1}`});
           } else {
             node.status({fill:"yellow", shape:"ring", text:`index ${msg.index} not in pattern`});
           }
