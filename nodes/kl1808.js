@@ -3,7 +3,7 @@ module.exports = function(RED) {
     RED.nodes.createNode(this, cfg);
     const node = this;
 
-    node.status({fill:"grey", shape:"ring", text:"waiting array (DI 0..7)"});
+    node.status({fill:"grey", shape:"ring", text:"waiting array"});
 
     function toBool(v) {
       const n = Number(v);
@@ -34,14 +34,14 @@ module.exports = function(RED) {
         // array in msg.payload
         if (Array.isArray(msg.payload)) {
           const outs = arrayToOutputs(msg.payload, { topic: msg.topic });
-          node.status({fill:"green", shape:"dot", text:"array → DI 1..8"});
+          node.status({fill:"green", shape:"dot", text:"array → ch 1..8"});
           send(outs);
           return done && done();
         }
         // {data:[...]}
         if (msg && msg.payload && Array.isArray(msg.payload.data)) {
           const outs = arrayToOutputs(msg.payload.data, { topic: msg.topic });
-          node.status({fill:"green", shape:"dot", text:"data[] → DI 1..8"});
+          node.status({fill:"green", shape:"dot", text:"data[] → ch 1..8"});
           send(outs);
           return done && done();
         }

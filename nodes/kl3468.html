@@ -9,85 +9,92 @@ RED.nodes.registerType('KL3468',{
     range:       { value: "0.5-10V" },   // "0-10V","0.5-10V","2-10V","custom"
     minV:        { value: 0.5 },
     maxV:        { value: 10.0 },
-    rawMax:      { value: 32767, validate: RED.validators.number() },
-    fullScaleV:  { value: 10.0,  validate: RED.validators.number() },
     adaptRaw:    { value: 1648,  validate: RED.validators.number() },
     adaptTol:    { value: 80,    validate: RED.validators.number() },
     decimals:    { value: 1,     validate: RED.validators.number() },
-    startIndex:  { value: 1,     validate: RED.validators.number() },   // first data word
-    step:        { value: 2,     validate: RED.validators.number() }    // word stride
+    startIndex:  { value: 1,     validate: RED.validators.number() },
+    step:        { value: 2,     validate: RED.validators.number() }
   },
   inputs: 1,
   outputs: 8,
   outputLabels: function(i){ return "Ch " + (i+1); },
-  label: function(){
-    return this.name || "KL3468";
+  label: function(){ return this.name || "KL3468"; },
+
+  oneditprepare: function () {
+    function toggleCustom(){
+      const isCustom = ($("#node-input-range").val() === "custom");
+      $(".kl3468-custom").toggle(isCustom);
+      $("#node-input-minV, #node-input-maxV").prop("disabled", !isCustom);
+    }
+    toggleCustom();
+    $("#node-input-range").on("change", toggleCustom);
   }
 });
 </script>
 
+<style>
+  /* prevent dropdown clipping in dialog */
+  .kl3468-wrap, .kl3468-wrap * , .kl3468-row { overflow: visible !important; }
+  .kl3468-row { position: relative; }
+</style>
+
 <script type="text/x-red" data-template-name="KL3468">
-  <div class="form-row">
-    <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
-    <input type="text" id="node-input-name" placeholder="KL3468 AI (8ch)">
-  </div>
+  <div class="kl3468-wrap">
+    <div class="form-row">
+      <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+      <input type="text" id="node-input-name" placeholder="KL3468">
+    </div>
 
-  <div class="form-row">
-    <label for="node-input-range"><i class="fa fa-arrows-h"></i> Range</label>
-    <select id="node-input-range">
-      <option value="0-10V">0–10 V</option>
-      <option value="0.5-10V">0.5–10 V</option>
-      <option value="2-10V">2–10 V</option>
-      <option value="custom">Custom (set below)</option>
-    </select>
-  </div>
+    <div class="form-row kl3468-row">
+      <label for="node-input-range"><i class="fa fa-arrows-h"></i> Range</label>
+      <select id="node-input-range">
+        <option value="0-10V">0–10 V</option>
+        <option value="0.5-10V">0.5–10 V</option>
+        <option value="2-10V">2–10 V</option>
+        <option value="custom">Custom (set below)</option>
+      </select>
+    </div>
 
-  <div class="form-row">
-    <label for="node-input-minV"><i class="fa fa-level-down"></i> Min V</label>
-    <input type="number" id="node-input-minV" step="0.01">
-  </div>
-  <div class="form-row">
-    <label for="node-input-maxV"><i class="fa fa-level-up"></i> Max V</label>
-    <input type="number" id="node-input-maxV" step="0.01">
-  </div>
+    <!-- Only visible when Range = custom -->
+    <div class="form-row kl3468-custom">
+      <label for="node-input-minV"><i class="fa fa-level-down"></i> Min V</label>
+      <input type="number" id="node-input-minV" step="0.01">
+    </div>
+    <div class="form-row kl3468-custom">
+      <label for="node-input-maxV"><i class="fa fa-level-up"></i> Max V</label>
+      <input type="number" id="node-input-maxV" step="0.01">
+    </div>
 
-  <hr/>
+    <hr/>
 
-  <div class="form-row">
-    <label for="node-input-rawMax"><i class="fa fa-tachometer"></i> RAW_MAX</label>
-    <input type="number" id="node-input-rawMax" placeholder="32767">
-  </div>
-  <div class="form-row">
-    <label for="node-input-fullScaleV"><i class="fa fa-bolt"></i> CARD_FULL_SCALE_V</label>
-    <input type="number" id="node-input-fullScaleV" step="0.01" placeholder="10.0">
-  </div>
-  <div class="form-row">
-    <label for="node-input-adaptRaw"><i class="fa fa-wrench"></i> ADAPT_RAW</label>
-    <input type="number" id="node-input-adaptRaw" placeholder="1648">
-  </div>
-  <div class="form-row">
-    <label for="node-input-adaptTol"><i class="fa fa-sliders"></i> ADAPT_TOL</label>
-    <input type="number" id="node-input-adaptTol" placeholder="80">
-  </div>
-  <div class="form-row">
-    <label for="node-input-decimals"><i class="fa fa-calculator"></i> Decimals</label>
-    <input type="number" id="node-input-decimals" min="0" max="6" step="1" placeholder="1">
-  </div>
+    <div class="form-row">
+      <label for="node-input-adaptRaw"><i class="fa fa-wrench"></i> ADAPT_RAW</label>
+      <input type="number" id="node-input-adaptRaw" placeholder="1648">
+    </div>
+    <div class="form-row">
+      <label for="node-input-adaptTol"><i class="fa fa-sliders"></i> ADAPT_TOL</label>
+      <input type="number" id="node-input-adaptTol" placeholder="80">
+    </div>
+    <div class="form-row">
+      <label for="node-input-decimals"><i class="fa fa-calculator"></i> Decimals</label>
+      <input type="number" id="node-input-decimals" min="0" max="6" step="1" placeholder="1">
+    </div>
 
-  <hr/>
+    <hr/>
 
-  <div class="form-row">
-    <label for="node-input-startIndex"><i class="fa fa-list-ol"></i> Start index</label>
-    <input type="number" id="node-input-startIndex" min="0" step="1" placeholder="1">
-  </div>
-  <div class="form-row">
-    <label for="node-input-step"><i class="fa fa-step-forward"></i> Step</label>
-    <input type="number" id="node-input-step" min="1" step="1" placeholder="2">
+    <div class="form-row">
+      <label for="node-input-startIndex"><i class="fa fa-list-ol"></i> Start index</label>
+      <input type="number" id="node-input-startIndex" min="0" step="1" placeholder="1">
+    </div>
+    <div class="form-row">
+      <label for="node-input-step"><i class="fa fa-step-forward"></i> Step</label>
+      <input type="number" id="node-input-step" min="1" step="1" placeholder="2">
+    </div>
   </div>
 </script>
 
 <script type="text/x-red" data-help-name="KL3468">
   <p><b>KL3468</b> – 8-channel analog input helper for Beckhoff terminals.</p>
-  <p>Input: a Modbus read result (array) that may include interleaved control words. Use <b>Start index</b> and <b>Step</b> to pick data words, e.g. start=1, step=2 ⇒ indices 1,3,5,7,9,11,13,15.</p>
-  <p>Output: 8 messages (one per output). Each payload: {state, raw, volts, percent, range}.</p>
+  <p>Input: Modbus array that may include interleaved control words. Use <b>Start index</b> and <b>Step</b> to pick data words (e.g. 1,3,5,7,9,11,13,15).</p>
+  <p>Output: 8 messages (one per output). Each payload: <code>{ state, raw, volts, percent, range }</code>.</p>
 </script>

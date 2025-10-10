@@ -47,9 +47,21 @@ module.exports = function(RED) {
       return { minC, maxC, sensor };
     }
 
-    function convert(rawUnsigned, chIdx) {
+    function mapSensorState(code) {
+      const n = Number(code);
+      if (!Number.isFinite(n)) return { name: "Unknown", code: null };
+      if (n === 1)  return { name: "OK",           code: 1 };
+      if (n === 65) return { name: "Configured",   code: 65 };       // configured, no sensor
+      if (n === 66) return { name: "Unconfigured", code: 66 };       // not configured
+      return { name: "Unknown", code: n };
+    }
+
+    function convert(rawUnsigned, chIdx, statusCode) {
       const rangeC = getRangeCForChannel(chIdx);
       const rawSigned = toSigned16(rawUnsigned); // centi-°C
+
+      const { name: sensorState, code: sensorStateCode } = mapSensorState(statusCode);
+
       if (!Number.isFinite(rawSigned)) {
         return {
           tempC: null, tempF: null,
@@ -58,7 +70,9 @@ module.exports = function(RED) {
           sensor: rangeC.sensor,
           rangeC: { minC: rangeC.minC, maxC: rangeC.maxC },
           rangeF: { minF: Number(cToF(rangeC.minC).toFixed(2)), maxF: Number(cToF(rangeC.maxC).toFixed(2)) },
-          state: "invalid"
+          state: "invalid",                    // existing field kept
+          sensorState,                         // NEW
+          sensorStateCode                      // NEW
         };
       }
       const tempC = rawSigned / 100.0;
@@ -73,16 +87,28 @@ module.exports = function(RED) {
         sensor: rangeC.sensor,
         rangeC: { minC: rangeC.minC, maxC: rangeC.maxC },
         rangeF: { minF: Number(cToF(rangeC.minC).toFixed(2)), maxF: Number(cToF(rangeC.maxC).toFixed(2)) },
-        state
+        state,                                 // existing field kept
+        sensorState,                           // NEW
+        sensorStateCode                        // NEW
       };
     }
 
     function arrayToOutputs(arr) {
       const outs = new Array(8).fill(null);
       for (let ch = 0; ch < 8; ch++) {
-        const idx = START_INDEX + ch * STEP;
-        if (idx < 0 || idx >= arr.length) {
+        const dataIdx   = START_INDEX + ch * STEP;          // e.g. 1,3,5,...
+        const statusIdx = dataIdx - 1;                      // neighbor control word e.g. 0,2,4,...
+
+        // derive status code if present
+        let statusCode = null;
+        if (statusIdx >= 0 && statusIdx < arr.length) {
+          const sc = Number(arr[statusIdx]);
+          statusCode = Number.isFinite(sc) ? sc : null;
+        }
+
+        if (dataIdx < 0 || dataIdx >= arr.length) {
           const r = getRangeCForChannel(ch);
+          const { name, code } = mapSensorState(statusCode);
           outs[ch] = {
             payload: {
               tempC: null, tempF: null,
@@ -90,14 +116,17 @@ module.exports = function(RED) {
               sensor: r.sensor,
               rangeC: { minC: r.minC, maxC: r.maxC },
               rangeF: { minF: Number(cToF(r.minC).toFixed(2)), maxF: Number(cToF(r.maxC).toFixed(2)) },
-              state: "missing"
+              state: "missing",
+              sensorState: name,
+              sensorStateCode: code
             },
-            index: idx, channel: ch+1
+            index: dataIdx, channel: ch+1
           };
           continue;
         }
-        const raw = Number(arr[idx]);
-        outs[ch] = { payload: convert(raw, ch), index: idx, channel: ch+1 };
+
+        const raw = Number(arr[dataIdx]);
+        outs[ch] = { payload: convert(raw, ch, statusCode), index: dataIdx, channel: ch+1 };
       }
       return outs;
     }
@@ -123,10 +152,15 @@ module.exports = function(RED) {
           send(outs); return done && done();
         }
         if (typeof msg.payload === 'number' && Number.isInteger(msg.index)) {
+          // single-value mode: no status word available -> Unknown
           const ch = mapSingleIndexToChannel(msg.index);
           const outs = new Array(8).fill(null);
           if (ch >= 0) {
-            outs[ch] = { payload: convert(msg.payload, ch), index: Number(msg.index), channel: ch+1 };
+            outs[ch] = {
+              payload: convert(msg.payload, ch, null),
+              index: Number(msg.index),
+              channel: ch+1
+            };
             node.status({fill:"green", shape:"dot", text:`single → ch ${ch+1}`});
           } else {
             node.status({fill:"yellow", shape:"ring", text:`index ${msg.index} not in pattern`});
