@@ -1,11 +1,12 @@
 <script type="text/javascript">
 (function(){
+  // Options shown in each channel's sensor dropdown
   const sensorOptions = [
     {v:"NTC10K", t:"NTC10K (−40…125°C)"},
     {v:"NTC20K", t:"NTC20K (−40…125°C)"},
     {v:"PT1000", t:"PT1000 (−50…200°C)"},
     {v:"PT100",  t:"PT100  (−200…850°C)"},
-    {v:"CUSTOM", t:"Custom (set min/max °C below)"},
+    {v:"CUSTOM", t:"Custom (set min/max °C below)"}
   ];
 
   function sensorSelect(id){
@@ -27,7 +28,7 @@
       step:       { value: 2,  validate: RED.validators.number() },
       units:      { value: "C" },  // "C" or "F"
 
-      // per-channel sensor + optional custom min/max °C
+      // Per-channel sensor + optional custom min/max °C overrides
       s1:{value:"NTC10K"}, s1min:{value:""}, s1max:{value:""},
       s2:{value:"NTC10K"}, s2min:{value:""}, s2max:{value:""},
       s3:{value:"NTC10K"}, s3min:{value:""}, s3max:{value:""},
@@ -42,34 +43,40 @@
     outputLabels: function(i){ return "Ch " + (i+1); },
     label: function(){ return this.name || "KL3208"; },
     oneditprepare: function(){
+      // Restore saved values into the form
       $("#node-input-units").val(this.units || "C");
+      $("#node-input-startIndex").val(this.startIndex != null ? this.startIndex : 1);
+      $("#node-input-step").val(this.step != null ? this.step : 2);
+
       for (let i=1;i<=8;i++){
-        $("#node-input-s"+i).val(this["s"+i] || "NTC10K");
-        if (this["s"+i+"min"] !== undefined) $("#node-input-s"+i+"min").val(this["s"+i+"min"]);
-        if (this["s"+i+"max"] !== undefined) $("#node-input-s"+i+"max").val(this["s"+i+"max"]);
+        const sKey = "s"+i, sMinKey = "s"+i+"min", sMaxKey = "s"+i+"max";
+        $("#node-input-"+sKey).val(this[sKey] || "NTC10K");
+        if (this[sMinKey] !== undefined) $("#node-input-"+sMinKey).val(this[sMinKey]);
+        if (this[sMaxKey] !== undefined) $("#node-input-"+sMaxKey).val(this[sMaxKey]);
       }
     }
   });
 
-  // build channel rows
+  // Build the 8 channel rows
   $(function(){
     for (let i=1;i<=8;i++){
       $("#kl3208-sensors").append(
         `<div class="form-row">
-          <label>Ch ${i} sensor</label>
-          ${sensorSelect("node-input-s"+i)}
-        </div>
-        <div class="form-row">
-          <label>Ch ${i} custom min/max (°C)</label>
-          <input type="number" id="node-input-s${i}min" step="0.1" placeholder="(optional)">
-          <input type="number" id="node-input-s${i}max" step="0.1" placeholder="(optional)">
-        </div>`
+           <label>Ch ${i} sensor</label>
+           ${sensorSelect("node-input-s"+i)}
+         </div>
+         <div class="form-row">
+           <label>Ch ${i} custom min/max (°C)</label>
+           <input type="number" id="node-input-s${i}min" step="0.1" placeholder="(optional)">
+           <input type="number" id="node-input-s${i}max" step="0.1" placeholder="(optional)">
+         </div>`
       );
     }
   });
 })();
 </script>
 
+<!-- Edit dialog -->
 <script type="text/x-red" data-template-name="KL3208">
   <div class="form-row">
     <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
@@ -97,12 +104,13 @@
   <div id="kl3208-sensors"></div>
 </script>
 
+<!-- Help text -->
 <script type="text/x-red" data-help-name="KL3208">
   <p><b>KL3208</b> — 8-channel resistance sensor input (temperature).</p>
   <ul>
-    <li>Input: Modbus array (or <code>{data:[…]}</code>) with interleaved words. Use <b>Start index</b> and <b>Step</b> (e.g., 1,3,5,7,9,11,13,15).</li>
-    <li>Per channel: select sensor type (NTC10K / NTC20K / PT1000 / PT100 / Custom) and optionally override min/max °C.</li>
-    <li>Raw is signed 16-bit centi-°C. Node converts to °C and °F, applies range check, and outputs a rich payload.</li>
+    <li><b>Input:</b> Modbus array (or <code>{data:[…]}</code>) with interleaved words (data/control). Use <b>Start index</b> and <b>Step</b> (e.g., 1,3,5,7,9,11,13,15).</li>
+    <li><b>Per channel:</b> choose sensor (<code>NTC10K</code>, <code>NTC20K</code>, <code>PT1000</code>, <code>PT100</code>, or <code>Custom</code>) and optionally override the min/max °C.</li>
+    <li>Raw words are <b>signed 16-bit centi-°C</b> (two’s complement). The node converts to °C and °F and applies range checks.</li>
   </ul>
-  <p>Output (per channel): <code>{ temp, units, tempC, tempF, rawUnsigned, rawSignedCenti, sensor, rangeC:{minC,maxC}, rangeF:{minF,maxF}, state }</code></p>
+  <p><b>Output (per channel)</b>: <code>{ temp, units, tempC, tempF, rawUnsigned, rawSignedCenti, sensor, rangeC:{minC,maxC}, rangeF:{minF,maxF}, state }</code>, where <code>state</code> is one of <code>ok</code>, <code>out_of_range</code>, <code>invalid</code>, or <code>missing</code>.</p>
 </script>
