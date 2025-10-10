@@ -90,7 +90,7 @@ module.exports = function(RED) {
       try {
         if (Array.isArray(msg.payload)) {
           const outs = arrayToOutputs(msg.payload);
-          node.status({fill:"green", shape:"dot", text:`array → ch 1..8 (start=${START_INDEX}, step=${STEP})`});
+          node.status({fill:"green", shape:"dot", text:`array → ch 1..8`});
           send(outs); return done && done();
         }
         if (msg && msg.payload && Array.isArray(msg.payload.data)) {

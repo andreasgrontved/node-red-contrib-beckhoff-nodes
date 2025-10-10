@@ -10,7 +10,7 @@ module.exports = function(RED) {
     const customMin = [];
     const customMax = [];
     for (let i=1; i<=8; i++) {
-      sensors.push(cfg["s"+i] || "NTC10K20K");
+      sensors.push(cfg["s"+i] || "NTC10K-20K");
       const minStr = cfg["s"+i+"min"];
       const maxStr = cfg["s"+i+"max"];
       customMin.push(minStr === "" || minStr === undefined ? null : Number(minStr));
@@ -18,7 +18,7 @@ module.exports = function(RED) {
     }
 
     const presetRangesC = {
-      "NTC10K20K": { minC: -40,  maxC: 125 },
+      "NTC10K-20K": { minC: -40,  maxC: 125 },
       "PT1000":    { minC: -50,  maxC: 200 },
       "PT100":     { minC: -200, maxC: 850 }
     };
@@ -58,7 +58,7 @@ module.exports = function(RED) {
 
     function convert(rawUnsigned, chIdx, statusCode) {
       const rangeC = getRangeCForChannel(chIdx);
-      const rawSigned = toSigned16(rawUnsigned); // centi-°C
+      const rawSigned = toSigned16(rawUnsigned); // -°C
 
       const { name: sensorState, code: sensorStateCode } = mapSensorState(statusCode);
 
@@ -66,7 +66,7 @@ module.exports = function(RED) {
         return {
           tempC: null, tempF: null,
           rawUnsigned: Number(rawUnsigned),
-          rawSignedCenti: null,
+          rawSigned: null,
           sensor: rangeC.sensor,
           rangeC: { minC: rangeC.minC, maxC: rangeC.maxC },
           rangeF: { minF: Number(cToF(rangeC.minC).toFixed(2)), maxF: Number(cToF(rangeC.maxC).toFixed(2)) },
@@ -77,13 +77,13 @@ module.exports = function(RED) {
       }
       const tempC = rawSigned / 100.0;
       const tempF = cToF(tempC);
-      const state = (tempC < rangeC.minC || tempC > rangeC.maxC) ? "out_of_range" : "ok";
+      const state = (tempC < rangeC.minC || tempC > rangeC.maxC) ? "out_of_range" : "OK";
 
       return {
         tempC: Number(tempC.toFixed(2)),
         tempF: Number(tempF.toFixed(2)),
         rawUnsigned: Number(rawUnsigned),
-        rawSignedCenti: Number(rawSigned),
+        rawSigned: Number(rawSigned),
         sensor: rangeC.sensor,
         rangeC: { minC: rangeC.minC, maxC: rangeC.maxC },
         rangeF: { minF: Number(cToF(rangeC.minC).toFixed(2)), maxF: Number(cToF(rangeC.maxC).toFixed(2)) },
@@ -112,7 +112,7 @@ module.exports = function(RED) {
           outs[ch] = {
             payload: {
               tempC: null, tempF: null,
-              rawUnsigned: null, rawSignedCenti: null,
+              rawUnsigned: null, rawSigned: null,
               sensor: r.sensor,
               rangeC: { minC: r.minC, maxC: r.maxC },
               rangeF: { minF: Number(cToF(r.minC).toFixed(2)), maxF: Number(cToF(r.maxC).toFixed(2)) },

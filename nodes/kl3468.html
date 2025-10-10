@@ -40,48 +40,13 @@ RED.nodes.registerType('KL3468',{
 
 <script type="text/x-red" data-template-name="KL3468">
   <div class="kl3468-wrap">
+    <!-- Name -->
     <div class="form-row">
-      <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+      <label for="node-input-name">Name</label>
       <input type="text" id="node-input-name" placeholder="KL3468">
     </div>
 
-    <div class="form-row kl3468-row">
-      <label for="node-input-range"><i class="fa fa-arrows-h"></i> Range</label>
-      <select id="node-input-range">
-        <option value="0-10V">0–10 V</option>
-        <option value="0.5-10V">0.5–10 V</option>
-        <option value="2-10V">2–10 V</option>
-        <option value="custom">Custom (set below)</option>
-      </select>
-    </div>
-
-    <!-- Only visible when Range = custom -->
-    <div class="form-row kl3468-custom">
-      <label for="node-input-minV"><i class="fa fa-level-down"></i> Min V</label>
-      <input type="number" id="node-input-minV" step="0.01">
-    </div>
-    <div class="form-row kl3468-custom">
-      <label for="node-input-maxV"><i class="fa fa-level-up"></i> Max V</label>
-      <input type="number" id="node-input-maxV" step="0.01">
-    </div>
-
-    <hr/>
-
-    <div class="form-row">
-      <label for="node-input-adaptRaw"><i class="fa fa-wrench"></i> ADAPT_RAW</label>
-      <input type="number" id="node-input-adaptRaw" placeholder="1648">
-    </div>
-    <div class="form-row">
-      <label for="node-input-adaptTol"><i class="fa fa-sliders"></i> ADAPT_TOL</label>
-      <input type="number" id="node-input-adaptTol" placeholder="80">
-    </div>
-    <div class="form-row">
-      <label for="node-input-decimals"><i class="fa fa-calculator"></i> Decimals</label>
-      <input type="number" id="node-input-decimals" min="0" max="6" step="1" placeholder="1">
-    </div>
-
-    <hr/>
-
+    <!-- Start index + Step moved to top (icons kept here only) -->
     <div class="form-row">
       <label for="node-input-startIndex"><i class="fa fa-list-ol"></i> Start index</label>
       <input type="number" id="node-input-startIndex" min="0" step="1" placeholder="1">
@@ -89,6 +54,46 @@ RED.nodes.registerType('KL3468',{
     <div class="form-row">
       <label for="node-input-step"><i class="fa fa-step-forward"></i> Step</label>
       <input type="number" id="node-input-step" min="1" step="1" placeholder="2">
+    </div>
+
+    <hr/>
+
+    <!-- Range (no icon) -->
+    <div class="form-row kl3468-row">
+      <label for="node-input-range">Range</label>
+      <select id="node-input-range">
+        <!-- values match JS exactly; labels are pretty -->
+        <option value="0-10V">0 – 10 V</option>
+        <option value="0.5-10V">0.5 – 10 V</option>
+        <option value="2-10V">2 – 10 V</option>
+        <option value="custom">Custom (set below)</option>
+      </select>
+    </div>
+
+    <!-- Only visible when Range = custom -->
+    <div class="form-row kl3468-custom">
+      <label for="node-input-minV">Min</label>
+      <input type="number" id="node-input-minV" step="0.01">
+    </div>
+    <div class="form-row kl3468-custom">
+      <label for="node-input-maxV">Max</label>
+      <input type="number" id="node-input-maxV" step="0.01">
+    </div>
+
+    <hr/>
+
+    <!-- Other settings (no icons) -->
+    <div class="form-row">
+      <label for="node-input-adaptRaw">Calibration</label>
+      <input type="number" id="node-input-adaptRaw" placeholder="1648">
+    </div>
+    <div class="form-row">
+      <label for="node-input-adaptTol">Calibration Tolerance</label>
+      <input type="number" id="node-input-adaptTol" placeholder="80">
+    </div>
+    <div class="form-row">
+      <label for="node-input-decimals">Decimals</label>
+      <input type="number" id="node-input-decimals" min="0" max="6" step="1" placeholder="1">
     </div>
   </div>
 </script>
