@@ -1,0 +1,151 @@
+<script type="text/javascript">
+(function(){
+  const sensorOptions = [
+    {v:"NTC10-K20K", t:"NTC10K-20K (−40…125°C)"},
+    {v:"PT1000",    t:"PT1000 (−50…200°C)"},
+    {v:"PT100",     t:"PT100  (−200…850°C)"},
+    {v:"CUSTOM",    t:"Custom (set min/max °C)"}
+  ];
+
+  function sensorSelect(id){
+    return `
+      <select id="${id}" class="kl3208-sel">
+        ${sensorOptions.map(o => `<option value="${o.v}">${o.t}</option>`).join("")}
+      </select>
+    `;
+  }
+
+  function customRow(i){
+    return `
+      <div class="form-row kl3208-custom kl3208-custom-${i}" style="display:none">
+        <label>&nbsp;</label>
+        <div class="kl3208-vstack">
+          <div class="kl3208-note">Custom min/max (°C)</div>
+          <input type="number" id="node-input-s${i}min" step="0.1" placeholder="min °C">
+          <input type="number" id="node-input-s${i}max" step="0.1" placeholder="max °C">
+        </div>
+      </div>
+    `;
+  }
+
+  function channelBlock(i){
+    return `
+      <div class="kl3208-channel">
+        <div class="form-row">
+          <label>Channel ${i}</label>
+          ${sensorSelect("node-input-s"+i)}
+        </div>
+        ${customRow(i)}
+      </div>
+    `;
+  }
+
+  function toggleCustom(i){
+    const val = $("#node-input-s"+i).val();
+    $(".kl3208-custom-"+i).toggle(val === "CUSTOM");
+  }
+
+  RED.nodes.registerType('KL3208',{
+    category: 'Beckhoff',
+    color: '#ffe9c6',
+    icon: 'font-awesome/fa-thermometer-half',
+    paletteLabel: 'KL3208',
+    defaults: {
+      name:       { value: "" },
+      startIndex: { value: 1,  validate: RED.validators.number() },
+      step:       { value: 2,  validate: RED.validators.number() },
+
+      s1:{value:"NTC10K-20K"}, s1min:{value:""}, s1max:{value:""},
+      s2:{value:"NTC10K-20K"}, s2min:{value:""}, s2max:{value:""},
+      s3:{value:"NTC10K-20K"}, s3min:{value:""}, s3max:{value:""},
+      s4:{value:"NTC10K-20K"}, s4min:{value:""}, s4max:{value:""},
+      s5:{value:"NTC10K-20K"}, s5min:{value:""}, s5max:{value:""},
+      s6:{value:"NTC10K-20K"}, s6min:{value:""}, s6max:{value:""},
+      s7:{value:"NTC10K-20K"}, s7min:{value:""}, s7max:{value:""},
+      s8:{value:"NTC10K-20K"}, s8min:{value:""}, s8max:{value:""}
+    },
+    inputs: 1,
+    outputs: 8,
+    outputLabels: i => "Ch " + (i+1),
+    label: function(){ return this.name || "KL3208"; },
+
+    oneditprepare: function(){
+      const $wrap = $("#kl3208-sensors").empty();
+
+      for (let i=1;i<=8;i++){
+        $wrap.append(channelBlock(i));
+        if (i < 8) $wrap.append('<hr class="kl3208-divider">');
+      }
+
+      $("#node-input-startIndex").val(this.startIndex ?? 1);
+      $("#node-input-step").val(this.step ?? 2);
+
+      for (let i=1;i<=8;i++){
+        $("#node-input-s"+i).val(this["s"+i] || "NTC10K-20K");
+        if (this["s"+i+"min"] !== undefined) $("#node-input-s"+i+"min").val(this["s"+i+"min"]);
+        if (this["s"+i+"max"] !== undefined) $("#node-input-s"+i+"max").val(this["s"+i+"max"]);
+        toggleCustom(i);
+      }
+
+      $(".kl3208-sel").on("change", function(){
+        const i = parseInt(this.id.replace("node-input-s",""),10);
+        toggleCustom(i);
+      });
+    }
+  });
+})();
+</script>
+
+<style>
+  /* Vertical stack for min/max inside the right column */
+  .kl3208-vstack{
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+  .kl3208-note{
+    font-size: 0.9em;
+    color: #777;
+    margin-bottom: -2px;
+  }
+  .kl3208-divider{
+    border: 0;
+    border-top: 1px solid #e5e5e5;
+    margin: 10px 0 12px;
+  }
+  /* prevent dropdown clipping */
+  #kl3208-sensors, #kl3208-sensors * , .kl3208-channel, .kl3208-channel .form-row {
+    overflow: visible !important;
+  }
+  .kl3208-channel, .kl3208-channel .form-row { position: relative; }
+</style>
+
+<script type="text/x-red" data-template-name="KL3208">
+  <div class="form-row">
+    <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+    <input type="text" id="node-input-name" placeholder="KL3208">
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-startIndex"><i class="fa fa-list-ol"></i> Start index</label>
+    <input type="number" id="node-input-startIndex" min="0" step="1" placeholder="1">
+  </div>
+  <div class="form-row">
+    <label for="node-input-step"><i class="fa fa-step-forward"></i> Step</label>
+    <input type="number" id="node-input-step" min="1" step="1" placeholder="2">
+  </div>
+
+  <hr/>
+  <div id="kl3208-sensors"></div>
+</script>
+
+<script type="text/x-red" data-help-name="KL3208">
+  <p><b>KL3208</b> — 8-channel resistance sensor input (temperature).</p>
+  <ul>
+    <li>Input: Modbus array (or <code>{data:[…]}</code>) with interleaved words. Use Start index + Step (e.g., 1,3,5,7,9,11,13,15).</li>
+    <li>Per channel: choose sensor (<code>NTC10K-20K</code>, <code>PT1000</code>, <code>PT100</code>, or <code>CUSTOM</code>). Custom min/max appears only when CUSTOM is selected.</li>
+    <li>Raw words are signed 16-bit centi-°C. Node outputs both °C and °F and applies range checks.</li>
+  </ul>
+  <p><b>Output (per channel)</b>: <code>{ tempC, tempF, rawUnsigned, rawSignedCenti, sensor, rangeC:{minC,maxC}, rangeF:{minF,maxF}, state }</code>.</p>
+</script>
