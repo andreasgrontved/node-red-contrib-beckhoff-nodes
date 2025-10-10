@@ -1,6 +1,6 @@
 {
   "name": "beckhoff-nodes",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Custom Beckhoff nodes for Node-RED",
   "license": "MIT",
   "keywords": ["node-red","beckhoff","kl3468","modbus"],
@@ -10,4 +10,3 @@
     }
   }
 }
-
