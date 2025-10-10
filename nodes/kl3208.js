@@ -3,24 +3,31 @@ module.exports = function(RED) {
     RED.nodes.createNode(this, cfg);
     const node = this;
 
-    // Interleaved mapping (data/ctrl like BK9100)
+    // interleaved mapping: data/control
     const START_INDEX = Number(cfg.startIndex || 1);
     const STEP        = Number(cfg.step || 2);
 
-    // Units preference
+    // units
     const UNITS = (cfg.units === "F") ? "F" : "C";
 
-    // Per-channel sensor types
-    const sensors = [
-      cfg.s1 || "NTC10K", cfg.s2 || "NTC10K", cfg.s3 || "NTC10K", cfg.s4 || "NTC10K",
-      cfg.s5 || "NTC10K", cfg.s6 || "NTC10K", cfg.s7 || "NTC10K", cfg.s8 || "NTC10K"
-    ];
+    // per-channel sensor + optional custom ranges
+    const sensors = [];
+    const customMin = [];
+    const customMax = [];
+    for (let i=1; i<=8; i++) {
+      sensors.push(cfg["s"+i] || "NTC10K");
+      const minStr = cfg["s"+i+"min"];
+      const maxStr = cfg["s"+i+"max"];
+      customMin.push(minStr === "" || minStr === undefined ? null : Number(minStr));
+      customMax.push(maxStr === "" || maxStr === undefined ? null : Number(maxStr));
+    }
 
-    // Ranges used only for validity/out_of_range reporting (base in °C)
-    const rangesC = {
-      "NTC10K": { minC: -40, maxC: 125 },
-      "NTC20K": { minC: -40, maxC: 125 },
-      "PT1000": { minC: -50, maxC: 200 }
+    // default preset ranges in °C
+    const presetRangesC = {
+      "NTC10K": { minC: -40,  maxC: 125 },
+      "NTC20K": { minC: -40,  maxC: 125 },
+      "PT1000": { minC: -50,  maxC: 200 },
+      "PT100":  { minC: -200, maxC: 850 }
     };
 
     node.status({fill:"grey", shape:"ring", text:`waiting array (start=${START_INDEX}, step=${STEP}, units=${UNITS})`});
@@ -33,31 +40,47 @@ module.exports = function(RED) {
       return n;
     }
 
-    function cToF(c) {
-      return (c * 9/5) + 32;
+    function cToF(c) { return (c * 9/5) + 32; }
+
+    function getRangeCForChannel(chIdx) {
+      const sensor = sensors[chIdx] || "NTC10K";
+
+      // If "CUSTOM", must supply custom min/max (fall back to NTC10K if missing)
+      if (sensor === "CUSTOM") {
+        const minC = (customMin[chIdx] == null ? -40 : customMin[chIdx]);
+        const maxC = (customMax[chIdx] == null ? 125  : customMax[chIdx]);
+        return { minC, maxC, sensor };
+      }
+
+      // Otherwise use preset, but allow optional override if provided
+      const preset = presetRangesC[sensor] || presetRangesC["NTC10K"];
+      const minC = (customMin[chIdx] == null ? preset.minC : customMin[chIdx]);
+      const maxC = (customMax[chIdx] == null ? preset.maxC : customMax[chIdx]);
+      return { minC, maxC, sensor };
     }
 
-    function convert(rawUnsigned, sensor) {
-      const base = rangesC[sensor] || rangesC["NTC10K"];
-      const rawSigned = toSigned16(rawUnsigned);   // centi-°C, signed
+    function convert(rawUnsigned, chIdx) {
+      const rangeC = getRangeCForChannel(chIdx); // includes chosen sensor
+      const sensor = rangeC.sensor;
+      const rawSigned = toSigned16(rawUnsigned); // centi-°C (signed)
       if (!Number.isFinite(rawSigned)) {
         return {
           temp: null, units: UNITS,
           tempC: null, tempF: null,
           rawUnsigned: Number(rawUnsigned),
           rawSignedCenti: null,
-          sensor, rangeC: base,
-          rangeF: { minF: cToF(base.minC), maxF: cToF(base.maxC) },
+          sensor,
+          rangeC: { minC: rangeC.minC, maxC: rangeC.maxC },
+          rangeF: { minF: Number(cToF(rangeC.minC).toFixed(2)), maxF: Number(cToF(rangeC.maxC).toFixed(2)) },
           state: "invalid"
         };
       }
 
       const tempC = rawSigned / 100.0;
       const tempF = cToF(tempC);
-      const state = (tempC < base.minC || tempC > base.maxC) ? "out_of_range" : "ok";
+      const state = (tempC < rangeC.minC || tempC > rangeC.maxC) ? "out_of_range" : "ok";
 
-      // expose both temps; set "temp" to selected units for easy wiring
-      const payload = {
+      return {
         temp: UNITS === "F" ? Number(tempF.toFixed(2)) : Number(tempC.toFixed(2)),
         units: UNITS,
         tempC: Number(tempC.toFixed(2)),
@@ -65,40 +88,34 @@ module.exports = function(RED) {
         rawUnsigned: Number(rawUnsigned),
         rawSignedCenti: Number(rawSigned),
         sensor,
-        rangeC: { minC: base.minC, maxC: base.maxC },
-        rangeF: { minF: Number(cToF(base.minC).toFixed(2)), maxF: Number(cToF(base.maxC).toFixed(2)) },
+        rangeC: { minC: rangeC.minC, maxC: rangeC.maxC },
+        rangeF: { minF: Number(cToF(rangeC.minC).toFixed(2)), maxF: Number(cToF(rangeC.maxC).toFixed(2)) },
         state
       };
-
-      return payload;
     }
 
     function arrayToOutputs(arr) {
       const outs = new Array(8).fill(null);
       for (let ch = 0; ch < 8; ch++) {
         const idx = START_INDEX + ch * STEP;
-        const sensor = sensors[ch];
         if (idx < 0 || idx >= arr.length) {
-          const base = rangesC[sensor] || rangesC["NTC10K"];
+          const r = getRangeCForChannel(ch);
           outs[ch] = {
             payload: {
               temp: null, units: UNITS,
               tempC: null, tempF: null,
-              rawUnsigned: null,
-              rawSignedCenti: null,
-              sensor,
-              rangeC: base,
-              rangeF: { minF: Number(cToF(base.minC).toFixed(2)), maxF: Number(cToF(base.maxC).toFixed(2)) },
+              rawUnsigned: null, rawSignedCenti: null,
+              sensor: r.sensor,
+              rangeC: { minC: r.minC, maxC: r.maxC },
+              rangeF: { minF: Number(cToF(r.minC).toFixed(2)), maxF: Number(cToF(r.maxC).toFixed(2)) },
               state: "missing"
             },
-            index: idx,
-            channel: ch+1
+            index: idx, channel: ch+1
           };
           continue;
         }
         const raw = Number(arr[idx]);
-        const payload = convert(raw, sensor);
-        outs[ch] = { payload, index: idx, channel: ch+1 };
+        outs[ch] = { payload: convert(raw, ch), index: idx, channel: ch+1 };
       }
       return outs;
     }
@@ -127,11 +144,7 @@ module.exports = function(RED) {
           const ch = mapSingleIndexToChannel(msg.index);
           const outs = new Array(8).fill(null);
           if (ch >= 0) {
-            outs[ch] = {
-              payload: convert(msg.payload, sensors[ch]),
-              index: Number(msg.index),
-              channel: ch+1
-            };
+            outs[ch] = { payload: convert(msg.payload, ch), index: Number(msg.index), channel: ch+1 };
             node.status({fill:"green", shape:"dot", text:`single → ch ${ch+1} (${UNITS})`});
           } else {
             node.status({fill:"yellow", shape:"ring", text:`index ${msg.index} not in pattern`});
