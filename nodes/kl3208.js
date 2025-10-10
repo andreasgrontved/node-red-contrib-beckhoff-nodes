@@ -50,7 +50,7 @@ module.exports = function(RED) {
     function mapSensorState(code) {
       const n = Number(code);
       if (!Number.isFinite(n)) return { name: "Unknown", code: null };
-      if (n === 1)  return { name: "OK",           code: 1 };
+      if (n === 1)  return { name: "OK",           code: 0 };
       if (n === 65) return { name: "Configured",   code: 65 };       // configured, no sensor
       if (n === 66) return { name: "Unconfigured", code: 66 };       // not configured
       return { name: "Unknown", code: n };
