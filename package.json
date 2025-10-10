@@ -1,12 +1,13 @@
 {
   "name": "beckhoff-nodes",
-  "version": "0.1.1",
-  "description": "Custom Beckhoff nodes for Node-RED",
+  "version": "0.2.0",
+  "description": "Custom Beckhoff nodes for Node-RED (KL3468, KL1808)",
   "license": "MIT",
-  "keywords": ["node-red","beckhoff","kl3468","modbus"],
+  "keywords": ["node-red","beckhoff","kl3468","kl1808","modbus"],
   "node-red": {
     "nodes": {
-      "KL3468": "nodes/kl3468.js"
+      "KL3468": "nodes/kl3468.js",
+      "KL1808": "nodes/kl1808.js"
     }
   }
 }

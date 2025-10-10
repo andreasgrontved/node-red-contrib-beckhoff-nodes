@@ -1,0 +1,29 @@
+<script type="text/javascript">
+RED.nodes.registerType('KL1808', {
+  category: 'Beckhoff',
+  color: '#dff5d8',
+  icon: 'font-awesome/fa-toggle-on',
+  paletteLabel: 'KL1808',
+  defaults: {
+    name: { value: "" }
+  },
+  inputs: 1,
+  outputs: 8,
+  outputLabels: function(i){ return "DI " + (i+1); },
+  label: function(){ return this.name || "KL1808"; }
+});
+</script>
+
+<script type="text/x-red" data-template-name="KL1808">
+  <div class="form-row">
+    <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+    <input type="text" id="node-input-name" placeholder="KL1808 DI (8ch)">
+  </div>
+</script>
+
+<script type="text/x-red" data-help-name="KL1808">
+  <p><b>KL1808</b> — 8-channel digital input splitter.</p>
+  <p>Input: an array (or <code>{data:[...]}</code>) from Modbus. Uses elements <code>[0..7]</code>.</p>
+  <p>Output: 8 messages (one per output) with <code>msg.payload = true|false</code>. Any nonzero value is treated as <code>true</code>.</p>
+  <p>Also accepts a single number with <code>msg.index</code> (0..7) and routes it to the matching channel.</p>
+</script>
