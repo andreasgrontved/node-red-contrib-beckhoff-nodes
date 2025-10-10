@@ -1,0 +1,90 @@
+<script type="text/javascript">
+(function(){
+  const sensorOptions = [
+    {v:"NTC10K", t:"NTC10K (-40…125°C)"},
+    {v:"NTC20K", t:"NTC20K (-40…125°C)"},
+    {v:"PT1000", t:"PT1000 (-50…200°C)"}
+  ];
+  function sensorSelect(id){
+    return `
+      <select id="${id}">
+        ${sensorOptions.map(o => `<option value="${o.v}">${o.t}</option>`).join("")}
+      </select>
+    `;
+  }
+  RED.nodes.registerType('KL3208',{
+    category: 'Beckhoff',
+    color: '#ffe9c6',
+    icon: 'font-awesome/fa-thermometer-half',
+    paletteLabel: 'KL3208',
+    defaults: {
+      name:       { value: "" },
+      startIndex: { value: 1,  validate: RED.validators.number() },
+      step:       { value: 2,  validate: RED.validators.number() },
+      units:      { value: "C" },  // "C" or "F"
+      s1: { value: "NTC10K" }, s2: { value: "NTC10K" },
+      s3: { value: "NTC10K" }, s4: { value: "NTC10K" },
+      s5: { value: "NTC10K" }, s6: { value: "NTC10K" },
+      s7: { value: "NTC10K" }, s8: { value: "NTC10K" }
+    },
+    inputs: 1,
+    outputs: 8,
+    outputLabels: function(i){ return "Ch " + (i+1); },
+    label: function(){ return this.name || "KL3208"; },
+    oneditprepare: function(){
+      ["s1","s2","s3","s4","s5","s6","s7","s8"].forEach(id=>{
+        $("#node-input-"+id).val(this[id] || "NTC10K");
+      });
+      $("#node-input-units").val(this.units || "C");
+    }
+  });
+
+  $(function(){
+    for (let i=1;i<=8;i++){
+      $("#kl3208-sensors").append(
+        `<div class="form-row">
+          <label>Ch ${i} sensor</label>
+          ${sensorSelect("node-input-s"+i)}
+        </div>`
+      );
+    }
+  });
+})();
+</script>
+
+<script type="text/x-red" data-template-name="KL3208">
+  <div class="form-row">
+    <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+    <input type="text" id="node-input-name" placeholder="KL3208 AI (8× temp)">
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-startIndex"><i class="fa fa-list-ol"></i> Start index</label>
+    <input type="number" id="node-input-startIndex" min="0" step="1" placeholder="1">
+  </div>
+  <div class="form-row">
+    <label for="node-input-step"><i class="fa fa-step-forward"></i> Step</label>
+    <input type="number" id="node-input-step" min="1" step="1" placeholder="2">
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-units"><i class="fa fa-thermometer-half"></i> Units</label>
+    <select id="node-input-units">
+      <option value="C">Celsius (°C)</option>
+      <option value="F">Fahrenheit (°F)</option>
+    </select>
+  </div>
+
+  <hr/>
+  <div id="kl3208-sensors"></div>
+</script>
+
+<script type="text/x-red" data-help-name="KL3208">
+  <p><b>KL3208</b> — 8-channel resistance sensor input (temperature).</p>
+  <ul>
+    <li>Input: Modbus array (or <code>{data:[…]}</code>) with interleaved words. Use <b>Start index</b> and <b>Step</b> (e.g., 1,3,5,7,9,11,13,15).</li>
+    <li>Each channel selects sensor type (NTC10K/20K/PT1000) to validate range. Raw is centi-°C (signed 16-bit). Node converts to °C, and optionally °F.</li>
+    <li>Output (per channel): <code>{ temp, units, tempC, tempF, rawUnsigned, rawSignedCenti, sensor, rangeC:{minC,maxC}, rangeF:{minF,maxF}, state }</code></li>
+    <li><code>state</code> ∈ <code>ok</code>, <code>out_of_range</code>, <code>invalid</code>, <code>missing</code>.</li>
+  </ul>
+</script>
