@@ -1,7 +1,7 @@
 <script type="text/javascript">
 (function(){
   const sensorOptions = [
-    {v:"NTC10-K20K", t:"NTC10K/20K (−40…125°C)"},
+    {v:"NTC10-K20K", t:"NTC10K-20K (−40…125°C)"},
     {v:"PT1000",    t:"PT1000 (−50…200°C)"},
     {v:"PT100",     t:"PT100  (−200…850°C)"},
     {v:"CUSTOM",    t:"Custom (set min/max °C)"}
@@ -144,7 +144,7 @@
   <p><b>KL3208</b> — 8-channel resistance sensor input (temperature).</p>
   <ul>
     <li>Input: Modbus array (or <code>{data:[…]}</code>) with interleaved words. Use Start index + Step (e.g., 1,3,5,7,9,11,13,15).</li>
-    <li>Per channel: choose sensor (<code>NTC10K/20K</code>, <code>PT1000</code>, <code>PT100</code>, or <code>CUSTOM</code>). Custom min/max appears only when CUSTOM is selected.</li>
+    <li>Per channel: choose sensor (<code>NTC10K-20K</code>, <code>PT1000</code>, <code>PT100</code>, or <code>CUSTOM</code>). Custom min/max appears only when CUSTOM is selected.</li>
     <li>Raw words are signed 16-bit centi-°C. Node outputs both °C and °F and applies range checks.</li>
   </ul>
   <p><b>Output (per channel)</b>: <code>{ tempC, tempF, rawUnsigned, rawSignedCenti, sensor, rangeC:{minC,maxC}, rangeF:{minF,maxF}, state }</code>.</p>
