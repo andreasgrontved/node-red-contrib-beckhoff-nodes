@@ -1,6 +1,5 @@
 <script type="text/javascript">
 (function(){
-  // Options shown per-channel
   const sensorOptions = [
     {v:"NTC10K20K", t:"NTC10K/20K (−40…125°C)"},
     {v:"PT1000",    t:"PT1000 (−50…200°C)"},
@@ -17,10 +16,13 @@
   }
 
   function customRow(i){
+    /* Blank label ensures the inputs align with the select (same right column).
+       A small inline note labels the inputs without shifting columns. */
     return `
       <div class="form-row kl3208-custom kl3208-custom-${i}" style="display:none">
-        <label>Custom</label>
+        <label>&nbsp;</label>
         <div class="kl3208-vstack">
+          <div class="kl3208-note">Custom min/max (°C)</div>
           <input type="number" id="node-input-s${i}min" step="0.1" placeholder="min °C">
           <input type="number" id="node-input-s${i}max" step="0.1" placeholder="max °C">
         </div>
@@ -28,12 +30,21 @@
     `;
   }
 
+  function channelBlock(i){
+    return `
+      <div class="kl3208-channel">
+        <div class="form-row">
+          <label>Channel ${i}</label>
+          ${sensorSelect("node-input-s"+i)}
+        </div>
+        ${customRow(i)}
+      </div>
+    `;
+  }
 
-  // Toggle custom fields visibility for a channel
   function toggleCustom(i){
     const val = $("#node-input-s"+i).val();
-    const show = (val === "CUSTOM");
-    $(".kl3208-custom-"+i).toggle(show);
+    $(".kl3208-custom-"+i).toggle(val === "CUSTOM");
   }
 
   RED.nodes.registerType('KL3208',{
@@ -45,9 +56,7 @@
       name:       { value: "" },
       startIndex: { value: 1,  validate: RED.validators.number() },
       step:       { value: 2,  validate: RED.validators.number() },
-      units:      { value: "C" },  // "C" or "F"
-
-      // Per-channel sensor + optional custom min/max °C overrides
+      units:      { value: "C" },
       s1:{value:"NTC10K20K"}, s1min:{value:""}, s1max:{value:""},
       s2:{value:"NTC10K20K"}, s2min:{value:""}, s2max:{value:""},
       s3:{value:"NTC10K20K"}, s3min:{value:""}, s3max:{value:""},
@@ -59,37 +68,33 @@
     },
     inputs: 1,
     outputs: 8,
-    outputLabels: function(i){ return "Ch " + (i+1); },
+    outputLabels: i => "Ch " + (i+1),
     label: function(){ return this.name || "KL3208"; },
 
     oneditprepare: function(){
-      // Build channel rows now (dialog DOM exists)
       const $wrap = $("#kl3208-sensors").empty();
+
+      // Build all channels with dividers
       for (let i=1;i<=8;i++){
-        $wrap.append(
-          `<div class="form-row">
-             <label>Channel ${i} </label>
-             ${sensorSelect("node-input-s"+i)}
-           </div>` + customRow(i)
-        );
+        $wrap.append(channelBlock(i));
+        if (i < 8) $wrap.append('<hr class="kl3208-divider">');
       }
 
       // Restore saved values
       $("#node-input-units").val(this.units || "C");
-      $("#node-input-startIndex").val(this.startIndex != null ? this.startIndex : 1);
-      $("#node-input-step").val(this.step != null ? this.step : 2);
+      $("#node-input-startIndex").val(this.startIndex ?? 1);
+      $("#node-input-step").val(this.step ?? 2);
 
       for (let i=1;i<=8;i++){
         $("#node-input-s"+i).val(this["s"+i] || "NTC10K20K");
         if (this["s"+i+"min"] !== undefined) $("#node-input-s"+i+"min").val(this["s"+i+"min"]);
         if (this["s"+i+"max"] !== undefined) $("#node-input-s"+i+"max").val(this["s"+i+"max"]);
-        toggleCustom(i); // show/hide according to current selection
+        toggleCustom(i);
       }
 
-      // Wire change events to toggle custom rows live
+      // Live toggle for custom
       $(".kl3208-sel").on("change", function(){
-        const id = $(this).attr("id"); // node-input-sX
-        const i = parseInt(id.replace("node-input-s",""),10);
+        const i = parseInt(this.id.replace("node-input-s",""),10);
         toggleCustom(i);
       });
     }
@@ -98,16 +103,23 @@
 </script>
 
 <style>
-  /* Vertical stack for min/max with consistent alignment */
+  /* Vertical stack for min/max inside the right column */
   .kl3208-vstack{
     display: flex;
     flex-direction: column;
-    gap: 8px;              /* spacing between min and max */
+    gap: 8px;
     width: 100%;
   }
-  .kl3208-vstack input{
-    width: 100%;          /* make inputs fill the right-hand column */
-    box-sizing: border-box;
+  .kl3208-note{
+    font-size: 0.9em;
+    color: #777;
+    margin-bottom: -2px;
+  }
+  /* Divider between channels */
+  .kl3208-divider{
+    border: 0;
+    border-top: 1px solid #e5e5e5;
+    margin: 10px 0 12px;
   }
 </style>
 
@@ -143,9 +155,8 @@
 <script type="text/x-red" data-help-name="KL3208">
   <p><b>KL3208</b> — 8-channel resistance sensor input (temperature).</p>
   <ul>
-    <li><b>Input:</b> Modbus array (or <code>{data:[…]}</code>) with interleaved words. Use <b>Start index</b> and <b>Step</b> (e.g., 1,3,5,7,9,11,13,15).</li>
-    <li><b>Per channel:</b> choose sensor (<code>NTC10K/20K</code>, <code>PT1000</code>, <code>PT100</code>, or <code>CUSTOM</code>). Custom min/max appears only when <code>CUSTOM</code> is selected.</li>
+    <li>Input: Modbus array (or <code>{data:[…]}</code>) with interleaved words. Use Start index + Step (e.g., 1,3,5,7,9,11,13,15).</li>
+    <li>Per channel: choose sensor (<code>NTC10K/20K</code>, <code>PT1000</code>, <code>PT100</code>, or <code>CUSTOM</code>). Custom min/max appears only when CUSTOM is selected.</li>
     <li>Raw words are signed 16-bit centi-°C. The node converts to °C and °F and applies range checks.</li>
   </ul>
-  <p><b>Output (per channel)</b>: <code>{ temp, units, tempC, tempF, rawUnsigned, rawSignedCenti, sensor, rangeC:{minC,maxC}, rangeF:{minF,maxF}, state }</code>.</p>
 </script>
