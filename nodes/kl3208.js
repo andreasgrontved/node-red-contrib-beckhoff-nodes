@@ -35,13 +35,13 @@ module.exports = function(RED) {
     function cToF(c) { return (c * 9/5) + 32; }
 
     function getRangeCForChannel(chIdx) {
-      const sensor = sensors[chIdx] || "NTC10K20K";
+      const sensor = sensors[chIdx] || "NTC10K-20K";
       if (sensor === "CUSTOM") {
         const minC = (customMin[chIdx] == null ? -40 : customMin[chIdx]);
         const maxC = (customMax[chIdx] == null ? 125  : customMax[chIdx]);
         return { minC, maxC, sensor };
       }
-      const preset = presetRangesC[sensor] || presetRangesC["NTC10K20K"];
+      const preset = presetRangesC[sensor] || presetRangesC["NTC10K-20K"];
       const minC = (customMin[chIdx] == null ? preset.minC : customMin[chIdx]);
       const maxC = (customMax[chIdx] == null ? preset.maxC : customMax[chIdx]);
       return { minC, maxC, sensor };
