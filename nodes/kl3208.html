@@ -20,9 +20,11 @@
     // wrapper has a per-channel class so we can show/hide easily
     return `
       <div class="form-row kl3208-custom kl3208-custom-${i}" style="display:none">
-        <label>Ch ${i} custom min/max (°C)</label>
-        <input type="number" id="node-input-s${i}min" step="0.1" placeholder="min °C">
-        <input type="number" id="node-input-s${i}max" step="0.1" placeholder="max °C">
+        <label>Custom min/max</label>
+        <div class="kl3208-mm">
+          <input type="number" id="node-input-s${i}min" class="kl3208-min" step="0.1" placeholder="min °C">
+          <input type="number" id="node-input-s${i}max" class="kl3208-max" step="0.1" placeholder="max °C">
+        </div>
       </div>
     `;
   }
@@ -66,7 +68,7 @@
       for (let i=1;i<=8;i++){
         $wrap.append(
           `<div class="form-row">
-             <label>Ch ${i} sensor</label>
+             <label>Channel ${i} </label>
              ${sensorSelect("node-input-s"+i)}
            </div>` + customRow(i)
         );
@@ -94,6 +96,20 @@
   });
 })();
 </script>
+
+<style>
+  /* Make min/max sit nicely in one row with spacing and equal widths */
+  .kl3208-mm{
+    display: flex;
+    gap: 10px;              /* spacing between min/max */
+    align-items: center;
+    width: 100%;
+  }
+  .kl3208-min,
+  .kl3208-max{
+    flex: 1 1 0;            /* equal width inputs */
+  }
+</style>
 
 <!-- Edit dialog -->
 <script type="text/x-red" data-template-name="KL3208">
@@ -128,7 +144,7 @@
   <p><b>KL3208</b> — 8-channel resistance sensor input (temperature).</p>
   <ul>
     <li><b>Input:</b> Modbus array (or <code>{data:[…]}</code>) with interleaved words. Use <b>Start index</b> and <b>Step</b> (e.g., 1,3,5,7,9,11,13,15).</li>
-    <li><b>Per channel:</b> choose sensor (<code>NTC10K/20K</code>, <code>PT1000</code>, <code>PT100</code>, or <code>CUSTOM</code>). Custom min/max fields only appear when <code>CUSTOM</code> is selected.</li>
+    <li><b>Per channel:</b> choose sensor (<code>NTC10K/20K</code>, <code>PT1000</code>, <code>PT100</code>, or <code>CUSTOM</code>). Custom min/max appears only when <code>CUSTOM</code> is selected.</li>
     <li>Raw words are signed 16-bit centi-°C. The node converts to °C and °F and applies range checks.</li>
   </ul>
   <p><b>Output (per channel)</b>: <code>{ temp, units, tempC, tempF, rawUnsigned, rawSignedCenti, sensor, rangeC:{minC,maxC}, rangeF:{minF,maxF}, state }</code>.</p>
