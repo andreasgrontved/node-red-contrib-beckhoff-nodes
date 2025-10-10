@@ -17,17 +17,17 @@
   }
 
   function customRow(i){
-    // wrapper has a per-channel class so we can show/hide easily
     return `
       <div class="form-row kl3208-custom kl3208-custom-${i}" style="display:none">
         <label>Custom min/max</label>
-        <div class="kl3208-mm">
-          <input type="number" id="node-input-s${i}min" class="kl3208-min" step="0.1" placeholder="min °C">
-          <input type="number" id="node-input-s${i}max" class="kl3208-max" step="0.1" placeholder="max °C">
+        <div class="kl3208-vstack">
+          <input type="number" id="node-input-s${i}min" step="0.1" placeholder="min °C">
+          <input type="number" id="node-input-s${i}max" step="0.1" placeholder="max °C">
         </div>
       </div>
     `;
   }
+
 
   // Toggle custom fields visibility for a channel
   function toggleCustom(i){
@@ -98,16 +98,16 @@
 </script>
 
 <style>
-  /* Make min/max sit nicely in one row with spacing and equal widths */
-  .kl3208-mm{
+  /* Vertical stack for min/max with consistent alignment */
+  .kl3208-vstack{
     display: flex;
-    gap: 10px;              /* spacing between min/max */
-    align-items: center;
+    flex-direction: column;
+    gap: 8px;              /* spacing between min and max */
     width: 100%;
   }
-  .kl3208-min,
-  .kl3208-max{
-    flex: 1 1 0;            /* equal width inputs */
+  .kl3208-vstack input{
+    width: 100%;          /* make inputs fill the right-hand column */
+    box-sizing: border-box;
   }
 </style>
 
