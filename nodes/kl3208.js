@@ -24,11 +24,12 @@ module.exports = function(RED) {
 
     // default preset ranges in °C
     const presetRangesC = {
-      "NTC10K": { minC: -40,  maxC: 125 },
-      "NTC20K": { minC: -40,  maxC: 125 },
-      "PT1000": { minC: -50,  maxC: 200 },
-      "PT100":  { minC: -200, maxC: 850 }
+        "NTC10K20K": { minC: -40,  maxC: 125 }, // combined option
+        "PT1000":    { minC: -50,  maxC: 200 },
+        "PT100":     { minC: -200, maxC: 850 }
     };
+
+
 
     node.status({fill:"grey", shape:"ring", text:`waiting array (start=${START_INDEX}, step=${STEP}, units=${UNITS})`});
 
