@@ -1,0 +1,81 @@
+<script type="text/javascript">
+RED.nodes.registerType('KL3468',{
+  category: 'Beckhoff',
+  color: '#c6e2ff',
+  icon: 'font-awesome/fa-sliders',
+  paletteLabel: 'KL3468',
+  defaults: {
+    name:        { value: "" },
+    range:       { value: "0.5-10V" },   // "0-10V","0.5-10V","2-10V","custom"
+    minV:        { value: 0.5 },         // used when range === "custom"
+    maxV:        { value: 10.0 },
+    rawMax:      { value: 32767, validate: RED.validators.number() },
+    fullScaleV:  { value: 10.0,  validate: RED.validators.number() },
+    adaptRaw:    { value: 1648,  validate: RED.validators.number() },
+    adaptTol:    { value: 80,    validate: RED.validators.number() },
+    decimals:    { value: 1,     validate: RED.validators.number() }
+  },
+  inputs: 1,
+  outputs: 8,
+  outputLabels: function(i){ return "Ch " + (i+1); },
+  label: function(){
+    return this.name || "KL3468";
+  }
+});
+</script>
+
+<script type="text/x-red" data-template-name="KL3468">
+  <div class="form-row">
+    <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+    <input type="text" id="node-input-name" placeholder="KL3468 AI (8ch)">
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-range"><i class="fa fa-arrows-h"></i> Range</label>
+    <select id="node-input-range">
+      <option value="0-10V">0–10 V</option>
+      <option value="0.5-10V">0.5–10 V</option>
+      <option value="2-10V">2–10 V</option>
+      <option value="custom">Custom (set below)</option>
+    </select>
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-minV"><i class="fa fa-level-down"></i> Min V</label>
+    <input type="number" id="node-input-minV" step="0.01">
+  </div>
+  <div class="form-row">
+    <label for="node-input-maxV"><i class="fa fa-level-up"></i> Max V</label>
+    <input type="number" id="node-input-maxV" step="0.01">
+  </div>
+
+  <hr/>
+
+  <div class="form-row">
+    <label for="node-input-rawMax"><i class="fa fa-tachometer"></i> RAW_MAX</label>
+    <input type="number" id="node-input-rawMax" placeholder="32767">
+  </div>
+  <div class="form-row">
+    <label for="node-input-fullScaleV"><i class="fa fa-bolt"></i> CARD_FULL_SCALE_V</label>
+    <input type="number" id="node-input-fullScaleV" step="0.01" placeholder="10.0">
+  </div>
+  <div class="form-row">
+    <label for="node-input-adaptRaw"><i class="fa fa-wrench"></i> ADAPT_RAW</label>
+    <input type="number" id="node-input-adaptRaw" placeholder="1648">
+  </div>
+  <div class="form-row">
+    <label for="node-input-adaptTol"><i class="fa fa-sliders"></i> ADAPT_TOL</label>
+    <input type="number" id="node-input-adaptTol" placeholder="80">
+  </div>
+  <div class="form-row">
+    <label for="node-input-decimals"><i class="fa fa-calculator"></i> Decimals</label>
+    <input type="number" id="node-input-decimals" min="0" max="6" step="1" placeholder="1">
+  </div>
+</script>
+
+<script type="text/x-red" data-help-name="KL3468">
+  <p><b>KL3468</b> – 8-channel analog input helper for Beckhoff terminals.</p>
+  <p>Input: a Modbus read result containing an array of 8 raw values (0..RAW_MAX) either as <code>msg.payload</code> or <code>msg.payload.data</code>.</p>
+  <p>Output: 8 messages (one per output). Each payload is an object: {state, raw, volts, percent, range}.</p>
+  <p>Configurable scaling: RAW_MAX, CARD_FULL_SCALE_V, voltage range (0–10 V / 0.5–10 V / 2–10 V / custom), adapting detection (ADAPT_RAW ± ADAPT_TOL), decimals.</p>
+</script>

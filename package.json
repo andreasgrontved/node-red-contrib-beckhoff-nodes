@@ -1,0 +1,12 @@
+{
+  "name": "beckhoff-nodes",
+  "version": "0.1.0",
+  "description": "Custom Beckhoff nodes for Node-RED (KL3468 analog input helper)",
+  "keywords": ["node-red", "beckhoff", "kl3468", "modbus"],
+  "license": "MIT",
+  "node-red": {
+    "nodes": {
+      "KL3468": "nodes/kl3468.js"
+    }
+  }
+}
