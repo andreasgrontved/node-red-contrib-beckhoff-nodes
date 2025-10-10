@@ -1,0 +1,152 @@
+<script type="text/javascript">
+(function(){
+  // Built-in models (extend as needed)
+  const MODELS = [
+    { id:"KL3468", label:"KL3468 (8× AI 0–10V)",  fc:4, channels:8, wordsPerCh:2, interleaved:true,  dataOffset:1, statusOffset:0, bitBased:false },
+    { id:"KL3208", label:"KL3208 (8× AI temp)",   fc:4, channels:8, wordsPerCh:2, interleaved:true,  dataOffset:1, statusOffset:0, bitBased:false },
+    { id:"KL1808", label:"KL1808 (8× DI)",        fc:2, channels:8, wordsPerCh:1, interleaved:false, dataOffset:0, statusOffset:null, bitBased:true  },
+    { id:"KL3464", label:"KL3464 (4× AI 0–10V)",  fc:4, channels:4, wordsPerCh:2, interleaved:true,  dataOffset:1, statusOffset:0, bitBased:false },
+    { id:"KL3204", label:"KL3204 (4× AI temp)",   fc:4, channels:4, wordsPerCh:2, interleaved:true,  dataOffset:1, statusOffset:0, bitBased:false }
+  ];
+  const modelMap = Object.fromEntries(MODELS.map(m => [m.id, m]));
+
+  function modelSelectHTML(selId, val){
+    return `
+      <select id="${selId}" style="width:100%">
+        ${MODELS.map(m => `<option value="${m.id}">${m.label}</option>`).join("")}
+      </select>
+    `;
+  }
+
+  RED.nodes.registerType('beckhoff-rack', {
+    category: 'Beckhoff',
+    color: '#E8F0FE',
+    icon: 'font-awesome/fa-server',
+    paletteLabel: 'Beckhoff Rack',
+    defaults: {
+      name:      { value: "" },
+      unitId:    { value: 1, validate: RED.validators.number() },
+      rackBase:  { value: 0, validate: RED.validators.number() },
+      layout:    { value: [] } // [{model:"KL3468"}...]
+    },
+    inputs: 1,
+    outputs: 1,
+    outputLabels: ["mapping"],
+    label: function(){ return this.name || "Beckhoff Rack"; },
+
+    oneditprepare: function() {
+      const node = this;
+
+      $('#node-input-unitId').val(this.unitId ?? 1);
+      $('#node-input-rackBase').val(this.rackBase ?? 0);
+
+      const list = $("#rack-list").css({minHeight:"180px"}).editableList({
+        addItem: function(row, index, data){
+          const model = data.model || "KL3468";
+          const selId = `rack-sel-${Date.now()}-${index}`;
+          const wrap = $(row);
+          wrap.css({display:"flex", gap:"6px", alignItems:"center"});
+          wrap.append(`<div style="flex:1">${modelSelectHTML(selId, model)}</div>`);
+          const sel = wrap.find(`#${selId}`);
+          sel.val(model);
+          row._getValue = () => ({ model: sel.val() });
+        },
+        sortable: true,
+        removable: true
+      });
+
+      // load existing layout
+      (node.layout || []).forEach(item => list.editableList('addItem', item));
+
+      // add button behavior
+      $("#rack-add-kl3468").on('click', () => list.editableList('addItem', {model:"KL3468"}));
+      $("#rack-add-kl3208").on('click', () => list.editableList('addItem', {model:"KL3208"}));
+      $("#rack-add-kl1808").on('click', () => list.editableList('addItem', {model:"KL1808"}));
+      $("#rack-add-kl3464").on('click', () => list.editableList('addItem', {model:"KL3464"}));
+      $("#rack-add-kl3204").on('click', () => list.editableList('addItem', {model:"KL3204"}));
+
+      // helper to recompute & preview
+      function recomputePreview(){
+        const unitId = Number($('#node-input-unitId').val() || 1);
+        const rackBase = Number($('#node-input-rackBase').val() || 0);
+        const items = list.editableList('items').map(function(i,el){ return el._getValue(); }).get();
+
+        let base = rackBase;
+        const rows = items.map((it, idx) => {
+          const meta = modelMap[it.model] || modelMap["KL3468"];
+          const length = meta.channels * meta.wordsPerCh;
+          const start = base;
+          base += length;
+          return {
+            slot: idx+1, model: it.model,
+            unitId, fc: meta.fc,
+            channels: meta.channels, wordsPerCh: meta.wordsPerCh,
+            interleaved: meta.interleaved, bitBased: meta.bitBased,
+            dataOffset: meta.dataOffset, statusOffset: meta.statusOffset,
+            start, length
+          };
+        });
+
+        // simple preview
+        const pre = rows.map(r => `#${r.slot} ${r.model}: start=${r.start}, len=${r.length}, FC=${r.fc}`).join('\n');
+        $("#rack-preview").val(pre);
+      }
+
+      $("#node-input-unitId, #node-input-rackBase").on("change keyup", recomputePreview);
+      $("#rack-list").on("change", "select", recomputePreview);
+      list.on('change', recomputePreview);
+      setTimeout(recomputePreview, 0);
+
+      this.oneditsave = function(){
+        const items = list.editableList('items').map(function(i,el){ return el._getValue(); }).get();
+        $("#node-input-layout").val(JSON.stringify(items));
+      };
+    }
+  });
+})();
+</script>
+
+<script type="text/x-red" data-template-name="beckhoff-rack">
+  <div class="form-row">
+    <label for="node-input-name">Name</label>
+    <input type="text" id="node-input-name" placeholder="BK9100 Rack">
+  </div>
+  <div class="form-row">
+    <label for="node-input-unitId">Unit ID</label>
+    <input type="number" id="node-input-unitId" min="1" step="1">
+  </div>
+  <div class="form-row">
+    <label for="node-input-rackBase">Rack base offset</label>
+    <input type="number" id="node-input-rackBase" min="0" step="1" placeholder="0">
+  </div>
+
+  <hr/>
+  <div class="form-row">
+    <label>Terminals (in order)</label>
+    <ol id="rack-list"></ol>
+  </div>
+  <div class="form-row">
+    <label>&nbsp;</label>
+    <div>
+      <button type="button" id="rack-add-kl3468">+ KL3468</button>
+      <button type="button" id="rack-add-kl3208">+ KL3208</button>
+      <button type="button" id="rack-add-kl1808">+ KL1808</button>
+      <button type="button" id="rack-add-kl3464">+ KL3464</button>
+      <button type="button" id="rack-add-kl3204">+ KL3204</button>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label>Preview</label>
+    <textarea id="rack-preview" style="width:100%; height:120px" readonly></textarea>
+  </div>
+
+  <!-- store layout JSON -->
+  <input type="hidden" id="node-input-layout">
+</script>
+
+<script type="text/x-red" data-help-name="beckhoff-rack">
+  <p>Describe the physical order of terminals on your BK9100. The node computes <b>start address</b>, <b>length</b>, and <b>function code</b> for each slot and outputs one message per slot.</p>
+  <p><b>Output payload:</b> <code>{ slot, model, unitId, fc, start, length, channels, wordsPerCh, interleaved, bitBased, dataOffset, statusOffset }</code></p>
+  <p>Wire the output through a <b>switch</b> (by <code>msg.payload.slot</code>) to each card’s flow to set base addresses.</p>
+</script>
