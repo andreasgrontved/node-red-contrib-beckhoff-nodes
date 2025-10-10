@@ -1,7 +1,7 @@
 <script type="text/javascript">
 (function(){
   const sensorOptions = [
-    {v:"NTC10K20K", t:"NTC10K/20K (−40…125°C)"},
+    {v:"NTC10-K20K", t:"NTC10K/20K (−40…125°C)"},
     {v:"PT1000",    t:"PT1000 (−50…200°C)"},
     {v:"PT100",     t:"PT100  (−200…850°C)"},
     {v:"CUSTOM",    t:"Custom (set min/max °C)"}
@@ -55,14 +55,14 @@
       startIndex: { value: 1,  validate: RED.validators.number() },
       step:       { value: 2,  validate: RED.validators.number() },
 
-      s1:{value:"NTC10K20K"}, s1min:{value:""}, s1max:{value:""},
-      s2:{value:"NTC10K20K"}, s2min:{value:""}, s2max:{value:""},
-      s3:{value:"NTC10K20K"}, s3min:{value:""}, s3max:{value:""},
-      s4:{value:"NTC10K20K"}, s4min:{value:""}, s4max:{value:""},
-      s5:{value:"NTC10K20K"}, s5min:{value:""}, s5max:{value:""},
-      s6:{value:"NTC10K20K"}, s6min:{value:""}, s6max:{value:""},
-      s7:{value:"NTC10K20K"}, s7min:{value:""}, s7max:{value:""},
-      s8:{value:"NTC10K20K"}, s8min:{value:""}, s8max:{value:""}
+      s1:{value:"NTC10K-20K"}, s1min:{value:""}, s1max:{value:""},
+      s2:{value:"NTC10K-20K"}, s2min:{value:""}, s2max:{value:""},
+      s3:{value:"NTC10K-20K"}, s3min:{value:""}, s3max:{value:""},
+      s4:{value:"NTC10K-20K"}, s4min:{value:""}, s4max:{value:""},
+      s5:{value:"NTC10K-20K"}, s5min:{value:""}, s5max:{value:""},
+      s6:{value:"NTC10K-20K"}, s6min:{value:""}, s6max:{value:""},
+      s7:{value:"NTC10K-20K"}, s7min:{value:""}, s7max:{value:""},
+      s8:{value:"NTC10K-20K"}, s8min:{value:""}, s8max:{value:""}
     },
     inputs: 1,
     outputs: 8,
@@ -81,7 +81,7 @@
       $("#node-input-step").val(this.step ?? 2);
 
       for (let i=1;i<=8;i++){
-        $("#node-input-s"+i).val(this["s"+i] || "NTC10K20K");
+        $("#node-input-s"+i).val(this["s"+i] || "NTC10K-20K");
         if (this["s"+i+"min"] !== undefined) $("#node-input-s"+i+"min").val(this["s"+i+"min"]);
         if (this["s"+i+"max"] !== undefined) $("#node-input-s"+i+"max").val(this["s"+i+"max"]);
         toggleCustom(i);
