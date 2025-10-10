@@ -5,11 +5,12 @@ module.exports = function(RED) {
 
     const unitId   = Number(cfg.unitId || 1);
     const rackBase = Number(cfg.rackBase || 0);
-    let layout = [];
+
+    let layout;
     try { layout = Array.isArray(cfg.layout) ? cfg.layout : JSON.parse(cfg.layout || "[]"); }
     catch { layout = []; }
+    const outputsCount = Number(cfg.outputsCount || (layout.length || 1));
 
-    // same metadata as in HTML
     const MODELS = {
       "KL3468": { fc:4, channels:8, wordsPerCh:2, interleaved:true,  dataOffset:1, statusOffset:0, bitBased:false },
       "KL3208": { fc:4, channels:8, wordsPerCh:2, interleaved:true,  dataOffset:1, statusOffset:0, bitBased:false },
@@ -18,9 +19,8 @@ module.exports = function(RED) {
       "KL3204": { fc:4, channels:4, wordsPerCh:2, interleaved:true,  dataOffset:1, statusOffset:0, bitBased:false }
     };
 
-    function computeMap(customBase) {
-      const base0 = Number.isFinite(customBase) ? Number(customBase) : rackBase;
-      let base = base0;
+    function computeMap(base0) {
+      let base = Number.isFinite(base0) ? Number(base0) : rackBase;
       const rows = (layout || []).map((it, idx) => {
         const meta = MODELS[it.model] || MODELS["KL3468"];
         const length = meta.channels * meta.wordsPerCh;
@@ -44,38 +44,38 @@ module.exports = function(RED) {
       return rows;
     }
 
-    function emitAll(rows){
-      rows.forEach(r => {
-        node.send({
-          payload: r,
-          topic: `slot/${r.slot}/${r.model}`
-        });
-      });
+    function emitRows(rows){
+      // build array of messages, one per output
+      const msgs = [];
+      for (let i=0; i<rows.length; i++){
+        msgs[i] = { payload: rows[i], topic: `slot/${rows[i].slot}/${rows[i].model}` };
+      }
+      // if node has more outputs than rows (or fewer), pad with nulls
+      while (msgs.length < outputsCount) msgs.push(null);
+      node.send(msgs);
     }
 
+    function run(baseOverride){
+      const rows = computeMap(baseOverride);
+      emitRows(rows);
+      node.status({fill:"blue", shape:"ring", text:`outputs: ${rows.length}`});
+    }
+
+    // emit once on deploy
+    try { run(); } catch(e){ node.error(e); node.status({fill:"red", shape:"dot", text:"init error"}); }
+
+    // re-emit on any input; allow msg.rackBase override
     node.on('input', (msg, send, done) => {
       try {
-        const baseOverride = (msg && Number.isFinite(Number(msg.rackBase))) ? Number(msg.rackBase) : undefined;
-        const rows = computeMap(baseOverride);
-        emitAll(rows);
-        node.status({fill:"green", shape:"dot", text:`emitted ${rows.length} slots`});
+        const override = (msg && Number.isFinite(Number(msg.rackBase))) ? Number(msg.rackBase) : undefined;
+        run(override);
         done && done();
-      } catch (e) {
-        node.status({fill:"red", shape:"dot", text:"error"});
+      } catch(e) {
         node.error(e, msg);
+        node.status({fill:"red", shape:"dot", text:"error"});
         done && done(e);
       }
     });
-
-    // emit once on deploy/start
-    try {
-      const rows = computeMap();
-      emitAll(rows);
-      node.status({fill:"blue", shape:"ring", text:`ready (${rows.length} slots)`});
-    } catch(e) {
-      node.status({fill:"red", shape:"dot", text:"init error"});
-      node.error(e);
-    }
   }
 
   RED.nodes.registerType("beckhoff-rack", BeckhoffRackNode);
