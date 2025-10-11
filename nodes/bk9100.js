@@ -2,11 +2,11 @@ module.exports = function (RED) {
     const Modbus = require('jsmodbus');
     const net = require('net');
 
-    // Card address sizes
-    const CARD_SIZES = {
-        'KL1808': 8,    // 8 digital inputs
-        'KL3208': 16,   // 8 analog × 2 (state + data)
-        'KL3468': 16    // 8 analog × 2 (state + data)
+    // Card address sizes and function codes
+    const CARD_INFO = {
+        'KL1808': { size: 8, fc: 'readCoils' },           // FC2 - Read Input Status (digital)
+        'KL3208': { size: 16, fc: 'readInputRegisters' }, // FC4 - Read Input Registers (analog)
+        'KL3468': { size: 16, fc: 'readInputRegisters' }  // FC4 - Read Input Registers (analog)
     };
 
     // State meanings for KL3208
@@ -211,59 +211,166 @@ module.exports = function (RED) {
         }
         if (!Array.isArray(cards)) cards = [];
 
-        const routes = cards.map(c => ({
-            type:  (c.type || "").toUpperCase(),  // Normalize to uppercase
-            label: c.label || "",
-            filter: c.filter || "",
-            config: c.config || null,
-            match: makeMatcher(c.filter || "", c.type || "")
-        }));
+        // Calculate address offsets for each card
+        const routes = [];
+        let currentAddress = 0;
+        
+        cards.forEach(c => {
+            const type = (c.type || "").toUpperCase();
+            const size = CARD_SIZES[type] || 0;
+            
+            routes.push({
+                type: type,
+                label: c.label || "",
+                filter: c.filter || "",
+                config: c.config || null,
+                startAddress: currentAddress,
+                size: size,
+                match: makeMatcher(c.filter || "", c.type || "")
+            });
+            
+            currentAddress += size;
+        });
 
-        node.status({ fill: "grey", shape: "dot", text: `${routes.length} outputs` });
+        // Modbus connection settings
+        const modbusHost = config.host || '192.168.1.100';
+        const modbusPort = parseInt(config.port) || 502;
+        const unitId = parseInt(config.unitId) || 1;
+        const pollInterval = parseInt(config.pollInterval) || 1000;
 
-        node.on('input', function (msg, send, done) {
+        let socket = null;
+        let client = null;
+        let pollTimer = null;
+        let reconnectTimer = null;
+
+        node.status({ fill: "grey", shape: "ring", text: "connecting..." });
+
+        // Connect to Modbus TCP
+        function connect() {
             try {
-                const topic = msg.topic;
-                const outs = new Array(Math.max(1, routes.length)).fill(null);
-                let hits = 0;
+                socket = new net.Socket();
+                client = new Modbus.client.TCP(socket, unitId);
 
-                routes.forEach((r, i) => {
-                    if (r.match(topic)) {
-                        let outMsg = RED.util.cloneMessage(msg);
-                        
-                        // Process based on card type
-                        if (Array.isArray(msg.payload)) {
-                            if (r.type === 'KL1808') {
-                                const converted = convertKL1808Data(msg.payload);
-                                outMsg.payload = converted;
-                            }
-                            else if (r.type === 'KL3208') {
-                                const converted = convertKL3208Data(msg.payload, r.config?.channels);
-                                outMsg.payload = converted;
-                            }
-                            else if (r.type === 'KL3468') {
-                                const converted = convertKL3468Data(msg.payload, r.config?.channels);
-                                outMsg.payload = converted;
-                            }
-                        }
-                        
-                        outs[i] = outMsg;
-                        hits++;
+                socket.connect({
+                    host: modbusHost,
+                    port: modbusPort
+                });
+
+                socket.on('connect', function() {
+                    node.status({ fill: "green", shape: "dot", text: `connected to ${modbusHost}` });
+                    if (reconnectTimer) {
+                        clearTimeout(reconnectTimer);
+                        reconnectTimer = null;
+                    }
+                    startPolling();
+                });
+
+                socket.on('error', function(err) {
+                    node.status({ fill: "red", shape: "ring", text: "error: " + err.message });
+                    node.error("Modbus error: " + err.message);
+                });
+
+                socket.on('close', function() {
+                    node.status({ fill: "yellow", shape: "ring", text: "disconnected" });
+                    stopPolling();
+                    // Attempt reconnect after 5 seconds
+                    if (!reconnectTimer) {
+                        reconnectTimer = setTimeout(connect, 5000);
                     }
                 });
-
-                node.status({
-                    fill: hits ? "green" : "yellow",
-                    shape: hits ? "dot" : "ring",
-                    text: `${topic ?? '(no topic)'} → ${hits}/${routes.length || 1}`
-                });
-
-                send(outs);
-                done && done();
             } catch (err) {
-                node.status({ fill: "red", shape: "ring", text: "error" });
-                done ? done(err) : node.error(err, msg);
+                node.status({ fill: "red", shape: "ring", text: "connection failed" });
+                node.error("Failed to connect: " + err.message);
+                if (!reconnectTimer) {
+                    reconnectTimer = setTimeout(connect, 5000);
+                }
             }
+        }
+
+        // Poll all cards
+        async function pollCards() {
+            if (!client || !socket || socket.destroyed) {
+                return;
+            }
+
+            const outs = new Array(routes.length).fill(null);
+
+            for (let i = 0; i < routes.length; i++) {
+                const route = routes[i];
+                
+                if (route.size === 0) {
+                    // Unknown card type, skip
+                    continue;
+                }
+
+                try {
+                    // Read input registers for this card
+                    const response = await client.readInputRegisters(
+                        route.startAddress, 
+                        route.size
+                    );
+                    
+                    const data = response.response._body._valuesAsArray;
+                    
+                    // Process based on card type
+                    let payload;
+                    if (route.type === 'KL1808') {
+                        payload = convertKL1808Data(data);
+                    } else if (route.type === 'KL3208') {
+                        payload = convertKL3208Data(data, route.config?.channels);
+                    } else if (route.type === 'KL3468') {
+                        payload = convertKL3468Data(data, route.config?.channels);
+                    } else {
+                        payload = data; // Unknown card, pass raw data
+                    }
+                    
+                    outs[i] = {
+                        topic: route.type,
+                        payload: payload
+                    };
+                    
+                } catch (err) {
+                    node.warn(`Error reading ${route.type} at address ${route.startAddress}: ${err.message}`);
+                    outs[i] = {
+                        topic: route.type,
+                        payload: { error: err.message }
+                    };
+                }
+            }
+
+            // Send to all outputs
+            node.send(outs);
+        }
+
+        function startPolling() {
+            if (pollTimer) clearInterval(pollTimer);
+            pollTimer = setInterval(pollCards, pollInterval);
+            pollCards(); // Poll immediately
+        }
+
+        function stopPolling() {
+            if (pollTimer) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+        }
+
+        // Start Modbus connection
+        connect();
+
+        // Cleanup on node close
+        node.on('close', function(done) {
+            stopPolling();
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer);
+                reconnectTimer = null;
+            }
+            if (socket) {
+                socket.removeAllListeners();
+                socket.end();
+                socket.destroy();
+            }
+            done();
         });
     }
 
