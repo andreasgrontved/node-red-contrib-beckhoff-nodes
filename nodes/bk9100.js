@@ -200,7 +200,7 @@ module.exports = function (RED) {
         if (!Array.isArray(cards)) cards = [];
 
         const routes = cards.map(c => ({
-            type:  c.type  || "",
+            type:  (c.type || "").toUpperCase(),  // Normalize to uppercase
             label: c.label || "",
             filter: c.filter || "",
             config: c.config || null,
@@ -219,15 +219,20 @@ module.exports = function (RED) {
                     if (r.match(topic)) {
                         let outMsg = RED.util.cloneMessage(msg);
                         
-                        // Process KL1808 data if applicable
-                        if (r.type.toUpperCase() === 'KL1808' && Array.isArray(msg.payload)) {
-                            const converted = convertKL1808Data(msg.payload);
-                            outMsg.payload = converted;
-                        }
-                        // Process KL3208 data if applicable
-                        else if (r.type.toUpperCase() === 'KL3208' && Array.isArray(msg.payload)) {
-                            const converted = convertKL3208Data(msg.payload, r.config?.channels);
-                            outMsg.payload = converted;
+                        // Process based on card type
+                        if (Array.isArray(msg.payload)) {
+                            if (r.type === 'KL1808') {
+                                const converted = convertKL1808Data(msg.payload);
+                                outMsg.payload = converted;
+                            }
+                            else if (r.type === 'KL3208') {
+                                const converted = convertKL3208Data(msg.payload, r.config?.channels);
+                                outMsg.payload = converted;
+                            }
+                            else if (r.type === 'KL3468') {
+                                const converted = convertKL3468Data(msg.payload, r.config?.channels);
+                                outMsg.payload = converted;
+                            }
                         }
                         
                         outs[i] = outMsg;
