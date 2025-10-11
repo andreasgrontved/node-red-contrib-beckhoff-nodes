@@ -7,6 +7,84 @@ module.exports = function (RED) {
         66: "Unconfigured"
     };
 
+    function convertKL3468Data(rawArray, channelConfigs) {
+        if (!Array.isArray(rawArray) || rawArray.length !== 16) {
+            return { error: "Expected 16-element array from Modbus" };
+        }
+
+        const channels = [];
+        
+        for (let ch = 0; ch < 8; ch++) {
+            const stateIdx = ch * 2;      // 0, 2, 4, 6, 8, 10, 12, 14
+            const dataIdx = ch * 2 + 1;   // 1, 3, 5, 7, 9, 11, 13, 15
+            
+            const state = rawArray[stateIdx];
+            let rawValue = rawArray[dataIdx];
+            
+            const config = channelConfigs?.[ch] || { range: '0-10', manufacturer: 'generic' };
+            const range = config.range || '0-10';
+            const manufacturer = config.manufacturer || 'generic';
+            
+            // Convert signed 16-bit integer
+            if (rawValue > 32767) {
+                rawValue = rawValue - 65536;
+            }
+            
+            // Convert raw value to voltage (32767 = 10V)
+            const voltage = (rawValue / 32767) * 10;
+            
+            // Determine range parameters
+            let minV, maxV, zeroRaw, adaptationRaw;
+            switch(range) {
+                case '0.5-10':
+                    minV = 0.5;
+                    maxV = 10;
+                    zeroRaw = 1638;  // 0.5V in raw units
+                    adaptationRaw = 1648;  // Belimo adaptation value
+                    break;
+                case '2-10':
+                    minV = 2;
+                    maxV = 10;
+                    zeroRaw = 6554;  // 2V in raw units
+                    adaptationRaw = null;
+                    break;
+                default: // '0-10'
+                    minV = 0;
+                    maxV = 10;
+                    zeroRaw = 0;
+                    adaptationRaw = null;
+            }
+            
+            // Calculate percentage (0-100%)
+            let percentage;
+            if (voltage < minV) {
+                percentage = 0;
+            } else if (voltage > maxV) {
+                percentage = 100;
+            } else {
+                percentage = ((voltage - minV) / (maxV - minV)) * 100;
+            }
+            
+            // Detect Belimo adaptation mode
+            const adaptationMode = (manufacturer === 'belimo' && 
+                                   range === '0.5-10' && 
+                                   Math.abs(rawValue - adaptationRaw) < 10);
+            
+            channels.push({
+                channel: ch + 1,
+                state,
+                rawValue,
+                voltage: Math.round(voltage * 100) / 100,
+                percentage: Math.round(percentage * 10) / 10,
+                range,
+                manufacturer,
+                adaptationMode
+            });
+        }
+        
+        return { channels };
+    }
+
     function convertKL1808Data(rawArray) {
         if (!Array.isArray(rawArray) || rawArray.length !== 8) {
             return { error: "Expected 8-element array from Modbus" };

@@ -54,9 +54,40 @@ RED.nodes.registerType('BK9100', {
             { value: 'ntc_100k', label: 'NTC 100kΩ' }
         ];
 
+        // Signal range options for KL3468
+        const rangeOptions = [
+            { value: '0-10', label: '0-10V' },
+            { value: '0.5-10', label: '0.5-10V' },
+            { value: '2-10', label: '2-10V' }
+        ];
+
+        // Manufacturer options for KL3468
+        const manufacturerOptions = [
+            { value: 'generic', label: 'Generic' },
+            { value: 'belimo', label: 'Belimo' }
+        ];
+
         function createSensorSelect(value) {
             const select = $('<select class="node-input-sensor-type" style="width:100%"></select>');
             sensorOptions.forEach(opt => {
+                select.append(`<option value="${opt.value}">${opt.label}</option>`);
+            });
+            if (value) select.val(value);
+            return select;
+        }
+
+        function createRangeSelect(value) {
+            const select = $('<select class="node-input-range-type" style="width:100%"></select>');
+            rangeOptions.forEach(opt => {
+                select.append(`<option value="${opt.value}">${opt.label}</option>`);
+            });
+            if (value) select.val(value);
+            return select;
+        }
+
+        function createManufacturerSelect(value) {
+            const select = $('<select class="node-input-manufacturer-type" style="width:100%"></select>');
+            manufacturerOptions.forEach(opt => {
                 select.append(`<option value="${opt.value}">${opt.label}</option>`);
             });
             if (value) select.val(value);
