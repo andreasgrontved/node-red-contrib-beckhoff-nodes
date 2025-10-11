@@ -24,9 +24,11 @@ module.exports = function (RED) {
         const channels = [];
         
         for (let ch = 0; ch < 8; ch++) {
+            const rawValue = rawArray[ch];
             channels.push({
                 channel: ch + 1,
-                value: rawArray[ch]
+                value: rawValue ? true : false,
+                rawValue: rawValue
             });
         }
         
