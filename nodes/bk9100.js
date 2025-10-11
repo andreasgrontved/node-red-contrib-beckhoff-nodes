@@ -7,6 +7,26 @@ module.exports = function (RED) {
         66: "Unconfigured"
     };
 
+    function convertKL1808Data(rawArray) {
+        if (!Array.isArray(rawArray) || rawArray.length !== 8) {
+            return { error: "Expected 8-element array from Modbus" };
+        }
+
+        const channels = [];
+        
+        for (let ch = 0; ch < 8; ch++) {
+            const rawValue = rawArray[ch];
+            
+            channels.push({
+                channel: ch + 1,
+                value: rawValue !== 0,
+                rawValue
+            });
+        }
+        
+        return { channels };
+    }
+
     function convertKL3208Data(rawArray, channelConfigs) {
         if (!Array.isArray(rawArray) || rawArray.length !== 16) {
             return { error: "Expected 16-element array from Modbus" };
@@ -124,8 +144,13 @@ module.exports = function (RED) {
                     if (r.match(topic)) {
                         let outMsg = RED.util.cloneMessage(msg);
                         
+                        // Process KL1808 data if applicable
+                        if (r.type.toUpperCase() === 'KL1808' && Array.isArray(msg.payload)) {
+                            const converted = convertKL1808Data(msg.payload);
+                            outMsg.payload = converted;
+                        }
                         // Process KL3208 data if applicable
-                        if (r.type.toUpperCase() === 'KL3208' && Array.isArray(msg.payload)) {
+                        else if (r.type.toUpperCase() === 'KL3208' && Array.isArray(msg.payload)) {
                             const converted = convertKL3208Data(msg.payload, r.config?.channels);
                             outMsg.payload = converted;
                         }
