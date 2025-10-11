@@ -312,15 +312,6 @@ RED.nodes.registerType('BK9100', {
         <input type="text" id="node-input-name" placeholder="BK9100">
     </div>
 
-    <div class="form-tips" style="margin-top:8px">
-        <b>Routing:</b> <code>msg.topic</code> is matched per card. If a card has a
-        <i>Topic filter</i>, it supports exact (<code>KL1808</code>), wildcard (<code>KL*</code>),
-        or regex (<code>/^KL3\\d{3}$/</code>). If empty, it matches the card <b>Type</b>.
-        Reorder cards to change output order; the number of outputs follows the list.
-        <br><b>KL3208:</b> Configure sensor types for each of the 8 channels.
-        <br><b>KL3468:</b> Configure voltage range and manufacturer for each of the 8 channels.
-    </div>
-
     <div id="bk-cards-header"></div>
     <div class="form-row"><div id="bk-cards"></div></div>
 </script>
