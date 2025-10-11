@@ -3,93 +3,47 @@ module.exports = function(RED){
     RED.nodes.createNode(this, cfg);
     const node = this;
 
+    // From your editor: an ordered array of rows/cards.
+    // We'll build a match list in the same order so outputs line up.
     const cards = Array.isArray(cfg.cards) ? cfg.cards : [];
 
-    // Build matchers (topic filters) once
-    const matchers = cards.map((c, index) => {
-      const type = (c.type || "").trim();
-      const label = c.label || "";
-      const filt = (c.topic || "").trim();
-
-      let kind = "none";
-      let re = null;
-      let exact = null;
-
-      if (filt) {
-        if (filt.startsWith("/") && filt.endsWith("/")) {
-          const body = filt.slice(1, -1);
-          re = new RegExp(body);
-          kind = "regex";
-        } else if (filt.includes("*")) {
-          const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-          const rx = "^" + filt.split("*").map(esc).join(".*") + "$";
-          re = new RegExp(rx);
-          kind = "wildcard";
-        } else {
-          exact = filt;
-          kind = "exact";
-        }
-      }
-
-      return { index, type, label, kind, exact, re };
+    // Build simple exact-match list.
+    // Prefer an explicit topic from the editor (if you added one),
+    // otherwise fall back to the card type ("KL1808", "KL3208", ...).
+    const matchList = cards.map(c => {
+      const t = (c && typeof c.topic === "string" && c.topic.trim()) || "";
+      const ty = (c && typeof c.type  === "string" && c.type.trim())  || "";
+      return t || ty; // exact string we will compare to msg.topic
     });
 
-    function findRowByType(type){
-      const ix = cards.findIndex(c => (c.type || "").trim() === type);
-      return ix;
-    }
-
-    function inferTypeFromTopic(topic){
-      const t = (topic || "");
-      if (t.includes("KL1808")) return "KL1808";
-      if (t.includes("KL3208")) return "KL3208";
-      if (t.includes("KL3468")) return "KL3468";
-      // Heuristics for your current names
-      if (/_DI/i.test(t)) return "KL1808";
-      if (/_AI/i.test(t)) return "KL3208";
-      return "";
-    }
-
-    function findOutputIndex(msg){
-      const topic = (typeof msg.topic === "string") ? msg.topic : "";
-
-      // 1) explicit topic filter match
-      for (const m of matchers) {
-        if (m.kind === "regex"    && m.re.test(topic)) return m.index;
-        if (m.kind === "wildcard" && m.re.test(topic)) return m.index;
-        if (m.kind === "exact"    && m.exact && topic === m.exact) return m.index;
+    // Helper: exact match index
+    function findIndexByTopic(topic){
+      if (typeof topic !== "string") return -1;
+      const t = topic.trim();
+      // 1) match against configured items
+      for (let i = 0; i < matchList.length; i++){
+        if (t === matchList[i]) return i;
       }
-
-      // 2) msg.cardType overrides
-      if (msg && typeof msg.cardType === "string" && msg.cardType.trim()){
-        const ix = findRowByType(msg.cardType.trim());
-        if (ix >= 0) return ix;
-      }
-
-      // 3) infer from topic
-      const inferred = inferTypeFromTopic(topic);
-      if (inferred){
-        const ix = findRowByType(inferred);
-        if (ix >= 0) return ix;
-      }
-
-      // 4) final fallback: exact type == topic
-      for (const m of matchers) {
-        if (m.type && topic === m.type) return m.index;
-      }
+      // 2) convenience fallback for common types if user didn’t configure rows:
+      const builtin = ["KL1808","KL3208","KL3468"];
+      const bi = builtin.indexOf(t);
+      if (bi >= 0 && bi < matchList.length) return bi;
       return -1;
     }
 
     node.on("input", (msg, send, done) => {
       try {
-        const idx = findOutputIndex(msg);
-        const outs = new Array(Math.max(1, cards.length)).fill(null);
-        if (idx >= 0) {
-          outs[idx] = msg; // forward unchanged
-          node.status({fill:"green", shape:"dot", text:`→ out ${idx+1} (${cards[idx]?.type || "?"})`});
+        const outs = new Array(Math.max(1, matchList.length)).fill(null);
+        const idx = findIndexByTopic(msg.topic);
+
+        if (idx >= 0){
+          // forward only the payload (as requested), keep topic
+          outs[idx] = { payload: msg.payload, topic: msg.topic };
+          node.status({fill:"green", shape:"dot", text:`${msg.topic} → out ${idx+1}`});
         } else {
-          node.status({fill:"yellow", shape:"ring", text:"no match"});
+          node.status({fill:"yellow", shape:"ring", text:`no match: ${String(msg.topic||"")}`});
         }
+
         send(outs);
         done && done();
       } catch (e){
@@ -99,5 +53,6 @@ module.exports = function(RED){
       }
     });
   }
+
   RED.nodes.registerType("BK9100", BK9100Node);
 };
