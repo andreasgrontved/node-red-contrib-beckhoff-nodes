@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "description": "Custom Beckhoff nodes for Node-RED",
   "license": "MIT",
-  "keywords": ["node-red","beckhoff","bk9100"],
+  "keywords": ["node-red","beckhoff","bk9100","modbus"],
+  "dependencies": {
+    "jsmodbus": "^4.0.6"
+  },
   "node-red": {
     "nodes": {
       "BK9100": "nodes/bk9100.js"

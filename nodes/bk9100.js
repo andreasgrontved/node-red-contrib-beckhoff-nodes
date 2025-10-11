@@ -1,4 +1,13 @@
 module.exports = function (RED) {
+    const Modbus = require('jsmodbus');
+    const net = require('net');
+
+    // Card address sizes
+    const CARD_SIZES = {
+        'KL1808': 8,    // 8 digital inputs
+        'KL3208': 16,   // 8 analog × 2 (state + data)
+        'KL3468': 16    // 8 analog × 2 (state + data)
+    };
 
     // State meanings for KL3208
     const STATE_MESSAGES = {
