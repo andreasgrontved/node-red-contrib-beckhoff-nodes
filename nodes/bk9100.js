@@ -244,10 +244,12 @@ module.exports = function (RED) {
                     label: c.label || "",
                     filter: c.filter || "",
                     config: c.config || null,
+                    pollRate: c.pollRate || null,
                     startAddress: startAddress,
                     size: cardInfo.size,
                     functionCode: cardInfo.fc,
-                    match: makeMatcher(c.filter || "", c.type || "")
+                    match: makeMatcher(c.filter || "", c.type || ""),
+                    lastPoll: 0
                 });
             }
         });
