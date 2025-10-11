@@ -3,19 +3,17 @@ module.exports = function (RED) {
     function makeMatcher(filter, fallbackExact) {
         if (filter && typeof filter === "string" && filter.length) {
             if (filter.startsWith("/") && filter.endsWith("/")) {
-                try {
-                    const re = new RegExp(filter.slice(1, -1));
-                    return t => typeof t === "string" && re.test(t);
-                } catch { return () => false; }
+                try { const re = new RegExp(filter.slice(1, -1)); return t => typeof t === "string" && re.test(t); }
+                catch { return () => false; }
             }
             if (filter.includes("*")) {
                 const esc = s => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
                 const re = new RegExp("^" + esc(filter).replace(/\*/g, ".*") + "$");
                 return t => typeof t === "string" && re.test(t);
             }
-            return t => t === filter;
+            return t => t === filter; // exact
         }
-        return t => t === fallbackExact;
+        return t => t === fallbackExact; // fallback to card.type
     }
 
     function BK9100Node(config) {

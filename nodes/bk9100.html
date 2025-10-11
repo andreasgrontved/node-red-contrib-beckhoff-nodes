@@ -6,13 +6,14 @@ RED.nodes.registerType('BK9100', {
     icon: 'bridge.svg',
 
     defaults: {
-        name:   { value: "" },
-        cards:  { value: [] },      // [{type,label,filter}]
-        outputs:{ value: 1 }        // persisted output count
+        name:    { value: "" },
+        cards:   { value: [] },     // [{type,label,filter}]
+        outputs: { value: 1 }       // persisted port count
     },
 
     inputs: 1,
-    outputs: 1,                     // editor will overwrite at runtime
+    outputs: 1,
+
     label: function () { return this.name || "BK9100"; },
     outputLabels: function (i) {
         const c = (this.cards || [])[i];
@@ -22,42 +23,68 @@ RED.nodes.registerType('BK9100', {
     oneditprepare: function () {
         const node = this;
 
+        // ensure hidden field exists (NR persists this on Deploy)
+        if (!$("#node-input-outputs").length) {
+            $('<input type="hidden" id="node-input-outputs">').appendTo("#dialog-form");
+        }
+
         function setOutputs(n){
             const v = Math.max(1, n|0);
-            // this hidden field is what Node-RED persists on Deploy
-            $("#node-input-outputs").val(v).trigger("change");
-            // keep the live editor widget in sync (optional, but nice)
-            node.outputs = v;
-            node.defaults.outputs = { value: v };
+            $("#node-input-outputs").val(v).trigger("change");  // persist
+            node.outputs = v;                                   // live preview
+            node.defaults.outputs = { value: v };               // reopen-safe
         }
 
         function recompute(){
             const n = $("#bk-cards").editableList('items').length;
-            setOutputs(n);
+            setOutputs(n || 1);
         }
 
-        $("#bk-cards").editableList({
-            addItem: function (container, index, data) {
-                // Simple, reliable layout (no flex issues)
-                const row = $('<div class="form-row"></div>').appendTo(container);
+        // Build header
+        const header = $(`
+          <div style="display:flex;gap:6px;padding:0 6px 4px 6px;align-items:center;">
+            <div style="width:180px;font-weight:600;">Type</div>
+            <div style="width:220px;font-weight:600;">Label</div>
+            <div style="flex:1;font-weight:600;">Topic filter</div>
+          </div>
+        `);
+        $("#bk-cards-header").empty().append(header);
 
-                const typeSel = $('<select class="node-input-card-type" style="width:180px;margin-right:6px"></select>')
+        // List
+        $("#bk-cards").editableList({
+            header: false,
+            addItem: function (container, index, data) {
+                // content row
+                const row = $('<div class="red-ui-editableList-item-content" style="display:flex;gap:6px;align-items:center;padding:2px 6px;"></div>')
+                    .appendTo(container);
+
+                // TYPE (select)
+                const typeWrap = $('<div style="width:180px"></div>').appendTo(row);
+                const typeSel = $('<select class="node-input-card-type" style="width:100%"></select>')
                     .append('<option value="KL1808">KL1808</option>')
                     .append('<option value="KL3208">KL3208</option>')
                     .append('<option value="KL3468">KL3468</option>')
-                    .appendTo(row);
+                    .appendTo(typeWrap);
 
-                $('<input type="text" class="node-input-card-label" style="width:220px;margin-right:6px" placeholder="Label (e.g. Inputs A)">')
-                    .appendTo(row);
+                // LABEL
+                const labelWrap = $('<div style="width:220px"></div>').appendTo(row);
+                const labelInp = $('<input type="text" class="node-input-card-label" style="width:100%" placeholder="e.g. Inputs A">')
+                    .appendTo(labelWrap);
 
-                $('<input type="text" class="node-input-card-filter" style="width:260px" placeholder="Exact, *wildcard*, or /regex/">')
-                    .appendTo(row);
+                // FILTER
+                const filterWrap = $('<div style="flex:1"></div>').appendTo(row);
+                const filterInp = $('<input type="text" class="node-input-card-filter" style="width:100%" placeholder="Exact, *wildcard*, or /regex/">')
+                    .appendTo(filterWrap);
 
-                if (data) {
+                // populate values
+                if (data && typeof data === "object") {
                     typeSel.val(data.type || "KL1808");
-                    row.find(".node-input-card-label").val(data.label || "");
-                    row.find(".node-input-card-filter").val(data.filter || "");
+                    labelInp.val(data.label || "");
+                    filterInp.val(data.filter || "");
                 }
+
+                // Make sure the delete handle keeps the layout
+                container.css("overflow", "visible");
             },
             removable: true,
             sortable: true,
@@ -66,17 +93,26 @@ RED.nodes.registerType('BK9100', {
             sortItems: recompute,
             removeItem: recompute,
             addItemBefore: recompute,
-            // called after addItem finishes rendering the controls
             addItem: function(){ recompute(); }
         });
 
-        // load saved cards
-        (node.cards || []).forEach(c => $("#bk-cards").editableList('addItem', c));
+        // Load saved cards (handle stringified edge-case defensively)
+        let cards = this.cards;
+        if (typeof cards === "string") {
+            try { cards = JSON.parse(cards); } catch { cards = []; }
+        }
+        (cards || []).forEach(c => $("#bk-cards").editableList('addItem', c));
+
+        // If none present, show one empty row so the ports don’t go to zero
+        if (!cards || !cards.length) {
+            $("#bk-cards").editableList('addItem', { type:"KL1808", label:"", filter:"" });
+        }
+
+        // Initialize ports (also sets the hidden output field)
         recompute();
     },
 
     oneditsave: function () {
-        // collect cards in current order
         const items = $("#bk-cards").editableList('items');
         const cards = [];
         items.each(function () {
@@ -87,17 +123,16 @@ RED.nodes.registerType('BK9100', {
                 filter: row.find(".node-input-card-filter").val() || ""
             });
         });
-        this.cards = cards;
-
+        this.cards   = cards;
         const n = Math.max(1, cards.length);
-        this.outputs = n;                               // runtime/editor object
-        $("#node-input-outputs").val(n).trigger("change"); // persisted value
+        this.outputs = n;
+        $("#node-input-outputs").val(n).trigger("change"); // persist on Deploy
     }
 });
 </script>
 
 <script type="text/x-red" data-template-name="BK9100">
-    <!-- IMPORTANT: this hidden field is what survives Deploy -->
+    <!-- Hidden: Node-RED reads this to keep output count after Deploy -->
     <input type="hidden" id="node-input-outputs">
 
     <div class="form-row">
@@ -113,8 +148,8 @@ RED.nodes.registerType('BK9100', {
         the number of outputs follows the list.
     </div>
 
-    <div class="form-row" style="margin-top:8px">
-        <div style="font-weight:600">Cards</div>
+    <div id="bk-cards-header"></div>
+    <div class="form-row">
         <div id="bk-cards"></div>
     </div>
 </script>
