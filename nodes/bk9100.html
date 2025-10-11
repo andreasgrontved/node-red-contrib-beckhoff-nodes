@@ -1,145 +1,123 @@
 <script type="text/javascript">
-(function(){
-
-  function rowTemplate(i, card){
-    const type = card?.type || "KL1808";
-    const label = card?.label || "";
-    const topic = card?.topic || "";
-    return `
-      <li class="bk-row" data-index="${i}">
-        <i class="fa fa-bars bk-drag" title="Drag to reorder"></i>
-        <span class="bk-idx">#${i+1}</span>
-
-        <label>Type</label>
-        <select class="bk-type">
-          <option ${type==="KL1808"?"selected":""}>KL1808</option>
-          <option ${type==="KL3208"?"selected":""}>KL3208</option>
-          <option ${type==="KL3468"?"selected":""}>KL3468</option>
-          <option ${type==="Custom" ?"selected":""}>Custom</option>
-        </select>
-
-        <label>Label</label>
-        <input type="text" class="bk-label" placeholder="e.g. Inputs A" value="${label}">
-
-        <label>Topic filter</label>
-        <input type="text" class="bk-topic" placeholder='Exact, *wildcard*, or /regex/' value='${topic.replace(/'/g,"&#39;")}'>
-        
-        <button class="bk-del" title="Remove"><i class="fa fa-trash"></i></button>
-      </li>
-    `;
-  }
-
-  function readList($list){
-    const items = [];
-    $list.children("li").each(function(){
-      const $li = $(this);
-      items.push({
-        type: $li.find(".bk-type").val(),
-        label: $li.find(".bk-label").val(),
-        topic: $li.find(".bk-topic").val()
-      });
-    });
-    return items;
-  }
-
-  function renderList($list, items){
-    $list.empty();
-    (items && items.length ? items : [{}]).forEach((c,i)=> $list.append(rowTemplate(i,c)));
-    $list.sortable({ handle: ".bk-drag", axis: "y" });
-
-    $list.on("click",".bk-del", function(e){
-      e.preventDefault();
-      $(this).closest("li").remove();
-    });
-  }
-
-  RED.nodes.registerType('BK9100',{
-    category: 'Beckhoff',
-    color: '#ffd1f2',
-    icon: 'font-awesome/fa-server',
-    paletteLabel: 'BK9100',
+RED.nodes.registerType('BK9100', {
+    category: 'function',
+    color: '#C7E9FF',
     defaults: {
-      name: { value: "" },
-      cards: { value: [] }   // [{type,label,topic}]
+        name: { value: "" },
+        cards: { value: [] }   // [{type,label,filter}]
     },
     inputs: 1,
-    outputs: function(){
-      const c = this.cards || [];
-      return Math.max(1, c.length);
-    },
-    outputLabels: function(i){
-      const c = this.cards || [];
-      const it = c[i];
-      if (!it) return "Card " + (i+1);
-      const label = it.label ? ` — ${it.label}` : "";
-      return `${it.type}${label}`;
-    },
-    label: function(){ return this.name || "BK9100"; },
+    outputs: 1,               // will be overridden via hidden field
+    icon: "bridge.svg",
+    label: function () { return this.name || "BK9100"; },
 
-    oneditprepare: function(){
-      const $list = $("#bk9100-cards");
-      renderList($list, Array.isArray(this.cards) ? this.cards : []);
+    oneditprepare: function () {
+        const node = this;
 
-      $("#bk-add").on("click", function(e){
-        e.preventDefault();
-        const cur = readList($list);
-        cur.push({ type:"KL1808", label:"", topic:"" });
-        renderList($list, cur);
-      });
+        // Hidden "outputs" control so NR saves the dynamic output count
+        if ($("#node-input-outputs").length === 0) {
+            $("<input/>", { type: "hidden", id: "node-input-outputs" })
+              .appendTo("#dialog-form");
+        }
+
+        function recomputeOutputs() {
+            const n = $("#bk-cards").editableList('items').length;
+            $("#node-input-outputs").val(Math.max(1, n));
+        }
+
+        // Cards list UI
+        $("#bk-cards").editableList({
+            addItem: function (container, index, data) {
+                const row = $('<div class="form-row" style="display:flex;gap:8px;align-items:center;"></div>').appendTo(container);
+
+                // Type dropdown (add/adjust as you like; can also be free-text)
+                const typeSel = $('<select/>', { class: "node-input-card-type", style:"width:180px" })
+                  .append('<option value="KL1808">KL1808</option>')
+                  .append('<option value="KL3208">KL3208</option>')
+                  .append('<option value="KL3468">KL3468</option>')
+                  .appendTo(row);
+
+                // Label
+                $('<input/>', {
+                    class: "node-input-card-label",
+                    type: "text",
+                    placeholder: "e.g. Inputs A",
+                    style: "flex:1"
+                }).appendTo(row);
+
+                // Topic filter
+                $('<input/>', {
+                    class: "node-input-card-filter",
+                    type: "text",
+                    placeholder: "Exact, *wildcard*, or /regex/",
+                    style: "width:260px"
+                }).appendTo(row);
+
+                // populate
+                if (data) {
+                    typeSel.val(data.type || "KL1808");
+                    row.find(".node-input-card-label").val(data.label || "");
+                    row.find(".node-input-card-filter").val(data.filter || "");
+                }
+
+                recomputeOutputs();
+            },
+            removable: true,
+            sortable: true,
+            height: "auto",
+            addButton: "Add card",
+            sortItems: recomputeOutputs,
+            removeItem: recomputeOutputs,
+            addItemBefore: recomputeOutputs
+        });
+
+        // load saved cards
+        (node.cards || []).forEach(c => $("#bk-cards").editableList('addItem', c));
+        recomputeOutputs();
     },
-    oneditsave: function(){
-      this.cards = readList($("#bk9100-cards"));
+
+    oneditsave: function () {
+        // gather ordered card data
+        const items = $("#bk-cards").editableList('items');
+        const cards = [];
+        items.each(function () {
+            const row = $(this);
+            cards.push({
+                type:  row.find(".node-input-card-type").val() || "",
+                label: row.find(".node-input-card-label").val() || "",
+                filter:row.find(".node-input-card-filter").val() || ""
+            });
+        });
+        this.cards = cards;
+        $("#node-input-outputs").val(Math.max(1, cards.length));
     }
-  });
-})();
+});
 </script>
 
-<style>
-  .bk-wrap { margin-top: 8px; }
-  .bk-list { list-style: none; padding: 0; margin: 0; }
-  .bk-row {
-    display: grid;
-    grid-template-columns: 20px 40px 50px 140px 60px 1fr 90px 1fr auto;
-    gap: 8px; align-items: center;
-    padding: 8px; margin-bottom: 8px;
-    border: 1px solid #e0e0e0; border-radius: 8px; background: #fff;
-  }
-  .bk-drag { cursor: move; color: #888; }
-  .bk-idx { color:#777; }
-  .bk-row label { color:#666; font-size: 0.85em; }
-  .bk-row input[type="text"]{ width: 100%; }
-  .bk-row select { width: 100%; }
-  .bk-del { background: transparent; border: none; color: #b33; }
-</style>
-
 <script type="text/x-red" data-template-name="BK9100">
-  <div class="form-row">
-    <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
-    <input type="text" id="node-input-name" placeholder="BK9100">
-  </div>
-
-  <hr/>
-  <div class="bk-wrap">
-    <ol id="bk9100-cards" class="bk-list"></ol>
     <div class="form-row">
-      <button id="bk-add"><i class="fa fa-plus"></i> Add card</button>
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="BK9100"/>
     </div>
-  </div>
+
+    <div class="form-tips" style="margin-top:8px">
+        <b>Routing:</b> Incoming <code>msg.topic</code> is matched to each card.
+        If a card has a <i>Topic filter</i>, that is used (supports exact, <code>*wildcard*</code>, or <code>/regex/</code>).
+        Otherwise it matches the card <i>Type</i> (e.g., <code>KL1808</code>).
+        Reorder cards to change output order; outputs follow automatically.
+    </div>
+
+    <div class="form-row" style="margin-top:8px">
+        <div style="font-weight:600">Cards</div>
+        <div id="bk-cards"></div>
+    </div>
 </script>
 
 <script type="text/x-red" data-help-name="BK9100">
-  <p><b>BK9100</b> routes incoming messages to the correct output based on <code>msg.topic</code>.</p>
-  <p>Add rows for each I/O card in rack order. Each row has:
+    <p>Routes <code>msg</code> to one of N outputs based on <code>msg.topic</code>.</p>
     <ul>
-      <li><b>Type</b>: KL1808, KL3208, KL3468, or Custom</li>
-      <li><b>Topic filter</b> to match <code>msg.topic</code>:
-        <ul>
-          <li><i>Exact</i>: <code>KL1808</code></li>
-          <li><i>Wildcard</i>: <code>bk/*/KL3208</code></li>
-          <li><i>Regex</i>: <code>/^site1\/slot\d+\/KL3468$/</code></li>
-        </ul>
-      </li>
+        <li><b>Topic filter</b>: exact (e.g. <code>KL1808</code>), wildcard (e.g. <code>KL*</code>), or regex (e.g. <code>/^KL3\d{3}$/</code>).</li>
+        <li>If no filter is provided, the card matches when <code>msg.topic</code> equals the card <b>Type</b>.</li>
+        <li>The number and order of outputs equals the number and order of cards.</li>
     </ul>
-  </p>
-  <p>When a message arrives, if its topic matches a row, the node sends the message (unchanged) to that row’s output.</p>
 </script>
