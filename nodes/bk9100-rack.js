@@ -3,19 +3,10 @@ module.exports = function(RED){
     RED.nodes.createNode(this, cfg);
     const node = this;
 
+    const host = (cfg.modbusHost || "").trim();
+    const unitId = Number(cfg.unitId || 1);
     const baseAddress = Number(cfg.baseAddress || 0);
     const cards = Array.isArray(cfg.cards) ? cfg.cards : [];
-
-    function typeDefaults(type){
-      if (type === "KL1808") {
-        return { channels: 8, wordsPerChannel: 1, register: "discrete-inputs", pattern: "contiguous" };
-      }
-      if (type === "KL3468") {
-        return { channels: 8, wordsPerChannel: 2, register: "input-registers", pattern: "interleaved-status-data" };
-      }
-      // KL3208
-      return { channels: 8, wordsPerChannel: 2, register: "input-registers", pattern: "interleaved-status-data" };
-    }
 
     function toFC(register){
       switch (register){
@@ -23,15 +14,25 @@ module.exports = function(RED){
         case "discrete-inputs": return 2;
         case "holding-registers": return 3;
         case "input-registers": return 4;
+        default: return 4;
       }
-      return null;
     }
 
     function compute(){
       let cur = baseAddress;
       const out = [];
+
       for (const c of cards){
-        const d = Object.assign({}, typeDefaults(c.type||"KL3208"), c);
+        // Only KL3208 for now
+        const d = Object.assign({
+          type: "KL3208",
+          channels: 8,
+          wordsPerChannel: 2,
+          register: "input-registers",
+          pattern: "interleaved-status-data",
+          settings: {}
+        }, c);
+
         const quantity = Number(d.channels) * Number(d.wordsPerChannel);
         const start = cur; cur += quantity;
 
@@ -40,10 +41,10 @@ module.exports = function(RED){
           : { startIndex: 0, step: 1, pattern: d.pattern };
 
         out.push({
-          type: d.type || "KL3208",
+          type: "KL3208",
           label: d.label || "",
           channels: Number(d.channels),
-          modbus: { register: d.register, start, quantity, fc: toFC(d.register) },
+          modbus: { host, unitId, register: d.register, start, quantity, fc: toFC(d.register) },
           map,
           settings: d.settings || {}
         });
@@ -54,17 +55,17 @@ module.exports = function(RED){
     function emitAll(){
       const slices = compute();
       const outs = slices.map(s => ({
-        payload: { command: "config", ...s },
-        config: s // convenient duplicate
+        payload: { command:"config", ...s },
+        config: s
       }));
       const need = Math.max(1, (node.outputs || slices.length));
       while (outs.length < need) outs.push(null);
-      node.status({fill:"green", shape:"dot", text:`${slices.length} card(s) from ${baseAddress}`});
+      node.status({fill:"green", shape:"dot", text:`${slices.length} KL3208 card(s) from ${baseAddress}`});
       node.send(outs);
     }
 
     setTimeout(emitAll, 25);
-    node.on("input", (msg, send, done) => { try { emitAll(); done && done(); } catch(e){ node.error(e,msg); node.status({fill:"red",shape:"dot",text:"error"}); done && done(e);} });
+    node.on("input",(msg,send,done)=>{ try { emitAll(); done&&done(); } catch(e){ node.error(e,msg); node.status({fill:"red",shape:"dot",text:"error"}); done&&done(e);} });
   }
   RED.nodes.registerType("BK9100 Rack", BK9100RackNode);
 };

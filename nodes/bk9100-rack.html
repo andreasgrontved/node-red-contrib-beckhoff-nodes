@@ -1,129 +1,136 @@
 <script type="text/javascript">
 (function(){
-  // UI helpers
-  function cardRow(i, card){
-    const c = {
-      type: card?.type || "KL3208",
-      label: card?.label || "",
-      channels: Number(card?.channels ?? 8),
-      wordsPerChannel: Number(card?.wordsPerChannel ?? (card?.type === "KL1808" ? 1 : 2)),
-      register: card?.register || (card?.type === "KL1808" ? "discrete-inputs" : "input-registers"),
-      pattern: card?.pattern || (card?.type === "KL1808" ? "contiguous" : "interleaved-status-data"),
-      settings: {
-        scalePreset: card?.settings?.scalePreset || "none",
-        rawMin: Number(card?.settings?.rawMin ?? 0),
-        rawMax: Number(card?.settings?.rawMax ?? 65535),
-        engMin: Number(card?.settings?.engMin ?? 0),
-        engMax: Number(card?.settings?.engMax ?? 10),
-        units: card?.settings?.units || "",
-        decimals: Number(card?.settings?.decimals ?? 2),
-        deadband: Number(card?.settings?.deadband ?? 0),
-        filterTau: Number(card?.settings?.filterTau ?? 0),
-        alarmLow: (card?.settings?.alarmLow ?? ""),
-        alarmHigh: (card?.settings?.alarmHigh ?? "")
-      }
-    };
 
+  // --- constants shared with KL3208 original ---
+  const SENSOR_OPTIONS = [
+    {v:"NTC10-K20K", t:"NTC10K-20K (−40…125°C)"},
+    {v:"PT1000",     t:"PT1000 (−50…200°C)"},
+    {v:"PT100",      t:"PT100  (−200…850°C)"},
+    {v:"CUSTOM",     t:"Custom (set min/max °C)"}
+  ];
+
+  function channelRow(i, s, sMin, sMax){
+    const idx = i+1;
+    const opts = SENSOR_OPTIONS.map(o => `<option value="${o.v}" ${s===o.v?"selected":""}>${o.t}</option>`).join("");
+    const customShow = (s === "CUSTOM") ? "" : 'style="display:none"';
     return `
-      <li class="bk-card" data-index="${i}">
-        <div class="bk-head">
-          <i class="fa fa-bars bk-drag"></i>
-          <span class="bk-idx">#${i+1}</span>
-          <label>Type</label>
-          <select class="bk-type">
-            <option ${c.type==="KL3208"?"selected":""}>KL3208</option>
-            <option ${c.type==="KL3468"?"selected":""}>KL3468</option>
-            <option ${c.type==="KL1808"?"selected":""}>KL1808</option>
-          </select>
-          <label>Label</label>
-          <input class="bk-label" type="text" placeholder="e.g. Room Temps" value="${c.label}">
-          <label>Ch</label>
-          <input class="bk-ch" type="number" min="1" max="32" step="1" value="${c.channels}">
-          <label>Words/Ch</label>
-          <input class="bk-wpc" type="number" min="1" max="8" step="1" value="${c.wordsPerChannel}">
-          <button class="bk-del" title="Remove"><i class="fa fa-trash"></i></button>
-        </div>
-
-        <div class="bk-row">
-          <label>Register</label>
-          <select class="bk-reg">
-            <option value="input-registers" ${c.register==="input-registers"?"selected":""}>Input Registers (FC4)</option>
-            <option value="holding-registers" ${c.register==="holding-registers"?"selected":""}>Holding Registers (FC3)</option>
-            <option value="discrete-inputs" ${c.register==="discrete-inputs"?"selected":""}>Discrete Inputs (FC2)</option>
-            <option value="coils" ${c.register==="coils"?"selected":""}>Coils (FC1)</option>
-          </select>
-
-          <label>Pattern</label>
-          <select class="bk-pattern">
-            <option value="contiguous" ${c.pattern==="contiguous"?"selected":""}>Contiguous</option>
-            <option value="interleaved-status-data" ${c.pattern==="interleaved-status-data"?"selected":""}>Interleaved status+data</option>
-          </select>
-        </div>
-
-        <details class="bk-adv">
-          <summary><i class="fa fa-sliders"></i> Card settings (scaling, units, alarms)</summary>
-          <div class="bk-grid">
-            <label>Preset</label>
-            <select class="bk-scalePreset">
-              <option value="none" ${c.settings.scalePreset==="none"?"selected":""}>None (use custom)</option>
-              <option value="0-10V" ${c.settings.scalePreset==="0-10V"?"selected":""}>0–10 V → V</option>
-              <option value="0-5V" ${c.settings.scalePreset==="0-5V"?"selected":""}>0–5 V → V</option>
-              <option value="4-20mA" ${c.settings.scalePreset==="4-20mA"?"selected":""}>4–20 mA → mA</option>
-              <option value="-50..150C" ${c.settings.scalePreset==="-50..150C"?"selected":""}>Temp (–50…150 °C linear)</option>
-            </select>
-
-            <label>Raw min</label><input class="bk-rawMin" type="number" value="${c.settings.rawMin}">
-            <label>Raw max</label><input class="bk-rawMax" type="number" value="${c.settings.rawMax}">
-            <label>Eng min</label><input class="bk-engMin" type="number" value="${c.settings.engMin}">
-            <label>Eng max</label><input class="bk-engMax" type="number" value="${c.settings.engMax}">
-            <label>Units</label><input class="bk-units" type="text" value="${c.settings.units}">
-            <label>Decimals</label><input class="bk-decimals" type="number" min="0" max="6" value="${c.settings.decimals}">
-            <label>Deadband</label><input class="bk-deadband" type="number" step="any" value="${c.settings.deadband}">
-            <label>LPF τ (s)</label><input class="bk-filterTau" type="number" step="any" value="${c.settings.filterTau}">
-            <label>Alarm low</label><input class="bk-alarmLow" type="number" step="any" value="${c.settings.alarmLow}">
-            <label>Alarm high</label><input class="bk-alarmHigh" type="number" step="any" value="${c.settings.alarmHigh}">
-          </div>
-        </details>
-      </li>
+      <div class="form-row kl3208-ch">
+        <label>CH ${idx}</label>
+        <select class="ch-sel" data-ix="${idx}">
+          ${opts}
+        </select>
+        <span class="custom-wrap" ${customShow}>
+          <label style="margin-left:8px">Min °C</label>
+          <input type="number" class="ch-min" data-ix="${idx}" value="${sMin ?? ""}">
+          <label style="margin-left:8px">Max °C</label>
+          <input type="number" class="ch-max" data-ix="${idx}" value="${sMax ?? ""}">
+        </span>
+      </div>
     `;
   }
 
-  function readList($list){
+  function renderKL3208Card($container, card){
+    $container.empty();
+
+    // Register/pattern are fixed for KL3208 typical usage
+    const reg = card.register || "input-registers";
+    const pattern = card.pattern || "interleaved-status-data";
+    const channels = 8;
+    let wordsPerChannel = 2; // status+data typical
+
+    $container.append(`
+      <div class="form-row">
+        <label>Register</label>
+        <select class="kl-reg">
+          <option value="input-registers" ${reg==="input-registers"?"selected":""}>Input Registers (FC4)</option>
+          <option value="holding-registers" ${reg==="holding-registers"?"selected":""}>Holding Registers (FC3)</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Pattern</label>
+        <select class="kl-pattern">
+          <option value="interleaved-status-data" ${pattern==="interleaved-status-data"?"selected":""}>Interleaved status+data</option>
+          <option value="contiguous" ${pattern==="contiguous"?"selected":""}>Contiguous</option>
+        </select>
+      </div>
+    `);
+
+    // Per-channel ranges (exactly like original)
+    const s = card.settings || {};
+    for (let i=0;i<channels;i++){
+      const ix = i+1;
+      const sel = s["s"+ix] || "NTC10-K20K";
+      const min = s["s"+ix+"min"];
+      const max = s["s"+ix+"max"];
+      $container.append(channelRow(i, sel, min, max));
+    }
+
+    // events
+    $container.on("change",".ch-sel", function(){
+      const v = $(this).val();
+      const ix = Number($(this).attr("data-ix"));
+      const $wrap = $(this).closest(".kl3208-ch").find(".custom-wrap");
+      if (v === "CUSTOM") $wrap.show(); else $wrap.hide();
+    });
+
+    // attach helpers for save
+    $container.data("__get__", function(){
+      const settings = {};
+      for (let i=1;i<=8;i++){
+        const v = $container.find(`.ch-sel[data-ix="${i}"]`).val();
+        const min = $container.find(`.ch-min[data-ix="${i}"]`).val();
+        const max = $container.find(`.ch-max[data-ix="${i}"]`).val();
+        settings["s"+i] = v;
+        settings["s"+i+"min"] = (v==="CUSTOM" && min !== "") ? Number(min) : null;
+        settings["s"+i+"max"] = (v==="CUSTOM" && max !== "") ? Number(max) : null;
+      }
+      return {
+        type: "KL3208",
+        channels: 8,
+        wordsPerChannel: wordsPerChannel,
+        register: $(".kl-reg", $container).val(),
+        pattern: $(".kl-pattern", $container).val(),
+        settings
+      };
+    });
+  }
+
+  function cardTemplate(i, card){
+    return `
+      <div class="kl-card" data-index="${i}">
+        <div class="form-row">
+          <label>#${i+1} Type</label>
+          <select class="kl-type">
+            <option value="KL3208" selected>KL3208</option>
+          </select>
+          <label style="margin-left:8px">Label</label>
+          <input type="text" class="kl-label" value="${card.label || ""}" placeholder="e.g. Room Temps">
+        </div>
+        <div class="kl-body"></div>
+      </div>
+    `;
+  }
+
+  function readCards($cardsRoot){
     const items = [];
-    $list.children("li").each(function(){
-      const $li = $(this);
-      items.push({
-        type: $li.find(".bk-type").val(),
-        label: $li.find(".bk-label").val(),
-        channels: Number($li.find(".bk-ch").val() || 8),
-        wordsPerChannel: Number($li.find(".bk-wpc").val() || 1),
-        register: $li.find(".bk-reg").val(),
-        pattern: $li.find(".bk-pattern").val(),
-        settings: {
-          scalePreset: $li.find(".bk-scalePreset").val(),
-          rawMin: Number($li.find(".bk-rawMin").val() || 0),
-          rawMax: Number($li.find(".bk-rawMax").val() || 65535),
-          engMin: Number($li.find(".bk-engMin").val() || 0),
-          engMax: Number($li.find(".bk-engMax").val() || 10),
-          units: $li.find(".bk-units").val() || "",
-          decimals: Number($li.find(".bk-decimals").val() || 2),
-          deadband: Number($li.find(".bk-deadband").val() || 0),
-          filterTau: Number($li.find(".bk-filterTau").val() || 0),
-          alarmLow: $li.find(".bk-alarmLow").val(),
-          alarmHigh: $li.find(".bk-alarmHigh").val()
-        }
-      });
+    $cardsRoot.children(".kl-card").each(function(){
+      const $c = $(this);
+      const label = $c.find(".kl-label").val();
+      const get = $c.find(".kl-body").data("__get__");
+      const obj = get ? get() : {};
+      items.push(Object.assign({ label }, obj));
     });
     return items;
   }
 
-  function renderList($list, items){
-    $list.empty();
-    items.forEach((c,i)=> $list.append(cardRow(i,c)));
-    $list.sortable({ handle: ".bk-drag", axis: "y" });
-    $list.on("click",".bk-del", function(e){
-      e.preventDefault();
-      $(this).closest("li").remove();
+  function renderCards($cardsRoot, cards){
+    $cardsRoot.empty();
+    (cards && cards.length ? cards : [{}]).forEach((card, i) => {
+      const html = cardTemplate(i, card);
+      const $card = $(html);
+      $cardsRoot.append($card);
+      const $body = $card.find(".kl-body");
+      renderKL3208Card($body, card); // only KL3208 for now
     });
   }
 
@@ -134,6 +141,8 @@
     paletteLabel: 'BK9100 Rack',
     defaults: {
       name: { value: "" },
+      modbusHost: { value: "", required: true },
+      unitId: { value: 1, validate: RED.validators.number() },
       baseAddress: { value: 0, validate: RED.validators.number() },
       cards: { value: [] }
     },
@@ -147,40 +156,32 @@
       const it = c[i];
       if (!it) return "Card " + (i+1);
       const label = it.label ? ` — ${it.label}` : "";
-      return `${it.type}${label}`;
+      return `${it.type || "KL3208"}${label}`;
     },
     label: function(){ return this.name || "BK9100 Rack"; },
 
     oneditprepare: function(){
-      const $list = $("#bk-cards");
-      const items = Array.isArray(this.cards) ? this.cards : [];
-      renderList($list, items);
+      const cards = Array.isArray(this.cards) ? this.cards : [];
+      renderCards($("#bk-cards"), cards);
+
       $("#bk-add").on("click", function(e){
         e.preventDefault();
-        const cur = readList($list);
-        cur.push({type:"KL3208", label:"", channels:8, wordsPerChannel:2, register:"input-registers", pattern:"interleaved-status-data", settings:{}});
-        renderList($list, cur);
+        const cur = readCards($("#bk-cards"));
+        cur.push({ type:"KL3208", label:"" });
+        renderCards($("#bk-cards"), cur);
       });
     },
     oneditsave: function(){
-      this.cards = readList($("#bk-cards"));
+      this.cards = readCards($("#bk-cards"));
     }
   });
 })();
 </script>
 
 <style>
-  .bk-wrap { margin-top: 8px; }
-  .bk-list { list-style: none; padding: 0; margin: 0; }
-  .bk-card { border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 10px; background: #fff; }
-  .bk-head { display: grid; grid-template-columns: 20px 40px 60px 140px 40px 80px 90px auto 40px; gap: 8px; align-items: center; padding: 8px; border-bottom: 1px solid #eee; }
-  .bk-row { display: grid; grid-template-columns: 80px 1fr 80px 1fr; gap: 8px; padding: 8px; }
-  .bk-idx { color: #777; }
-  .bk-drag { cursor: move; color: #888; }
-  .bk-del { background: transparent; border: none; color: #b33; }
-  .bk-adv summary { cursor: pointer; padding: 8px 12px; background: #fafafa; border-top: 1px solid #eee; }
-  .bk-grid { display: grid; grid-template-columns: 120px 1fr 120px 1fr; gap: 8px; padding: 8px 12px 12px; }
-  .bk-grid input[type="number"], .bk-grid input[type="text"], .bk-grid select { width: 100%; }
+  .kl-card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px; margin-bottom: 10px; background:#fff; }
+  .kl-card .form-row > label { min-width: 80px; }
+  .kl-body .form-row { margin-top: 6px; }
 </style>
 
 <script type="text/x-red" data-template-name="BK9100 Rack">
@@ -189,32 +190,32 @@
     <input type="text" id="node-input-name" placeholder="BK9100 Rack">
   </div>
   <div class="form-row">
+    <label for="node-input-modbusHost"><i class="fa fa-plug"></i> Modbus server IP</label>
+    <input type="text" id="node-input-modbusHost" placeholder="192.168.1.10">
+  </div>
+  <div class="form-row">
+    <label for="node-input-unitId"><i class="fa fa-hashtag"></i> Unit ID</label>
+    <input type="number" id="node-input-unitId" min="1" step="1" placeholder="1">
+  </div>
+  <div class="form-row">
     <label for="node-input-baseAddress"><i class="fa fa-list-ol"></i> Base address</label>
     <input type="number" id="node-input-baseAddress" min="0" step="1" placeholder="0">
   </div>
-  <div class="bk-wrap">
-    <ol id="bk-cards" class="bk-list"></ol>
-    <button id="bk-add"><i class="fa fa-plus"></i> Add card</button>
+
+  <hr/>
+  <div id="bk-cards"></div>
+  <div class="form-row">
+    <button id="bk-add"><i class="fa fa-plus"></i> Add card (KL3208)</button>
   </div>
 </script>
 
 <script type="text/x-red" data-help-name="BK9100 Rack">
-  <p><b>BK9100 Rack</b> defines your Beckhoff terminal order and emits one <i>config</i> message per card output.</p>
-  <p>Each message contains the computed Modbus slice (<code>register</code>, <code>start</code>, <code>quantity</code>) and card-specific <i>settings</i> (scaling, units, deadband, LPF τ, alarms).</p>
+  <p><b>BK9100 Rack</b> — Global Modbus settings + ordered list of KL3208 cards.</p>
+  <p>On deploy or any input, the node computes each card’s Modbus slice and emits a config message on the matching output.</p>
+  <p><b>msg.config passed to KL3208</b> includes:</p>
   <pre>{
-  type: "KL3208",
-  label: "Room Temps",
-  channels: 8,
-  modbus: { register: "input-registers", start: 0, quantity: 16, fc: 4 },
-  map: { startIndex: 1, step: 2, pattern: "interleaved-status-data" },
-  settings: {
-    scalePreset: "0-10V",
-    rawMin: 0, rawMax: 65535,
-    engMin: 0, engMax: 10,
-    units: "V", decimals: 2,
-    deadband: 0.05, filterTau: 2.0,
-    alarmLow: null, alarmHigh: 9.5
-  }
+  modbus: { host, unitId, register, start, quantity, fc },
+  map: { startIndex, step, pattern },
+  settings: { s1..s8, s1min..s8min, s1max..s8max }
 }</pre>
-  <p>Wire each output to the corresponding card node input.</p>
 </script>
