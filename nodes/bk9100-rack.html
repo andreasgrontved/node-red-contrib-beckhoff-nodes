@@ -1,43 +1,89 @@
-
 <script type="text/javascript">
 (function(){
+  // UI helpers
   function cardRow(i, card){
-    const type = card?.type || "KL3208";
-    const label = card?.label || "";
-    const channels = card?.channels || 8;
-    // wordsPerChannel is derived from type, but allow override
-    const wpc = card?.wordsPerChannel ?? (type === "KL1808" ? 1 : 2);
-    const reg = card?.register || (type === "KL1808" ? "discrete-inputs" : "input-registers");
-    const pattern = card?.pattern || (type === "KL1808" ? "contiguous" : "interleaved-status-data");
+    const c = {
+      type: card?.type || "KL3208",
+      label: card?.label || "",
+      channels: Number(card?.channels ?? 8),
+      wordsPerChannel: Number(card?.wordsPerChannel ?? (card?.type === "KL1808" ? 1 : 2)),
+      register: card?.register || (card?.type === "KL1808" ? "discrete-inputs" : "input-registers"),
+      pattern: card?.pattern || (card?.type === "KL1808" ? "contiguous" : "interleaved-status-data"),
+      settings: {
+        scalePreset: card?.settings?.scalePreset || "none",
+        rawMin: Number(card?.settings?.rawMin ?? 0),
+        rawMax: Number(card?.settings?.rawMax ?? 65535),
+        engMin: Number(card?.settings?.engMin ?? 0),
+        engMax: Number(card?.settings?.engMax ?? 10),
+        units: card?.settings?.units || "",
+        decimals: Number(card?.settings?.decimals ?? 2),
+        deadband: Number(card?.settings?.deadband ?? 0),
+        filterTau: Number(card?.settings?.filterTau ?? 0),
+        alarmLow: (card?.settings?.alarmLow ?? ""),
+        alarmHigh: (card?.settings?.alarmHigh ?? "")
+      }
+    };
+
     return `
-      <li class="bk9100-card" data-index="${i}">
-        <i class="fa fa-bars bk9100-drag"></i>
-        <span class="bk9100-idx">#${i+1}</span>
-        <label>Type</label>
-        <select class="bk9100-type">
-          <option ${type==="KL3208"?"selected":""}>KL3208</option>
-          <option ${type==="KL3468"?"selected":""}>KL3468</option>
-          <option ${type==="KL1808"?"selected":""}>KL1808</option>
-        </select>
-        <label>Label</label>
-        <input class="bk9100-label" type="text" placeholder="e.g. Room Temps" value="${label}">
-        <label>Ch</label>
-        <input class="bk9100-ch" type="number" min="1" max="32" step="1" value="${channels}">
-        <label>Words/Ch</label>
-        <input class="bk9100-wpc" type="number" min="1" max="8" step="1" value="${wpc}">
-        <label>Register</label>
-        <select class="bk9100-reg">
-          <option value="input-registers" ${reg==="input-registers"?"selected":""}>Input Registers (FC4)</option>
-          <option value="holding-registers" ${reg==="holding-registers"?"selected":""}>Holding Registers (FC3)</option>
-          <option value="discrete-inputs" ${reg==="discrete-inputs"?"selected":""}>Discrete Inputs (FC2)</option>
-          <option value="coils" ${reg==="coils"?"selected":""}>Coils (FC1)</option>
-        </select>
-        <label>Pattern</label>
-        <select class="bk9100-pattern">
-          <option value="contiguous" ${pattern==="contiguous"?"selected":""}>Contiguous data only</option>
-          <option value="interleaved-status-data" ${pattern==="interleaved-status-data"?"selected":""}>Interleaved status+data</option>
-        </select>
-        <button class="bk9100-del"><i class="fa fa-trash"></i></button>
+      <li class="bk-card" data-index="${i}">
+        <div class="bk-head">
+          <i class="fa fa-bars bk-drag"></i>
+          <span class="bk-idx">#${i+1}</span>
+          <label>Type</label>
+          <select class="bk-type">
+            <option ${c.type==="KL3208"?"selected":""}>KL3208</option>
+            <option ${c.type==="KL3468"?"selected":""}>KL3468</option>
+            <option ${c.type==="KL1808"?"selected":""}>KL1808</option>
+          </select>
+          <label>Label</label>
+          <input class="bk-label" type="text" placeholder="e.g. Room Temps" value="${c.label}">
+          <label>Ch</label>
+          <input class="bk-ch" type="number" min="1" max="32" step="1" value="${c.channels}">
+          <label>Words/Ch</label>
+          <input class="bk-wpc" type="number" min="1" max="8" step="1" value="${c.wordsPerChannel}">
+          <button class="bk-del" title="Remove"><i class="fa fa-trash"></i></button>
+        </div>
+
+        <div class="bk-row">
+          <label>Register</label>
+          <select class="bk-reg">
+            <option value="input-registers" ${c.register==="input-registers"?"selected":""}>Input Registers (FC4)</option>
+            <option value="holding-registers" ${c.register==="holding-registers"?"selected":""}>Holding Registers (FC3)</option>
+            <option value="discrete-inputs" ${c.register==="discrete-inputs"?"selected":""}>Discrete Inputs (FC2)</option>
+            <option value="coils" ${c.register==="coils"?"selected":""}>Coils (FC1)</option>
+          </select>
+
+          <label>Pattern</label>
+          <select class="bk-pattern">
+            <option value="contiguous" ${c.pattern==="contiguous"?"selected":""}>Contiguous</option>
+            <option value="interleaved-status-data" ${c.pattern==="interleaved-status-data"?"selected":""}>Interleaved status+data</option>
+          </select>
+        </div>
+
+        <details class="bk-adv">
+          <summary><i class="fa fa-sliders"></i> Card settings (scaling, units, alarms)</summary>
+          <div class="bk-grid">
+            <label>Preset</label>
+            <select class="bk-scalePreset">
+              <option value="none" ${c.settings.scalePreset==="none"?"selected":""}>None (use custom)</option>
+              <option value="0-10V" ${c.settings.scalePreset==="0-10V"?"selected":""}>0–10 V → V</option>
+              <option value="0-5V" ${c.settings.scalePreset==="0-5V"?"selected":""}>0–5 V → V</option>
+              <option value="4-20mA" ${c.settings.scalePreset==="4-20mA"?"selected":""}>4–20 mA → mA</option>
+              <option value="-50..150C" ${c.settings.scalePreset==="-50..150C"?"selected":""}>Temp (–50…150 °C linear)</option>
+            </select>
+
+            <label>Raw min</label><input class="bk-rawMin" type="number" value="${c.settings.rawMin}">
+            <label>Raw max</label><input class="bk-rawMax" type="number" value="${c.settings.rawMax}">
+            <label>Eng min</label><input class="bk-engMin" type="number" value="${c.settings.engMin}">
+            <label>Eng max</label><input class="bk-engMax" type="number" value="${c.settings.engMax}">
+            <label>Units</label><input class="bk-units" type="text" value="${c.settings.units}">
+            <label>Decimals</label><input class="bk-decimals" type="number" min="0" max="6" value="${c.settings.decimals}">
+            <label>Deadband</label><input class="bk-deadband" type="number" step="any" value="${c.settings.deadband}">
+            <label>LPF τ (s)</label><input class="bk-filterTau" type="number" step="any" value="${c.settings.filterTau}">
+            <label>Alarm low</label><input class="bk-alarmLow" type="number" step="any" value="${c.settings.alarmLow}">
+            <label>Alarm high</label><input class="bk-alarmHigh" type="number" step="any" value="${c.settings.alarmHigh}">
+          </div>
+        </details>
       </li>
     `;
   }
@@ -47,12 +93,25 @@
     $list.children("li").each(function(){
       const $li = $(this);
       items.push({
-        type: $li.find(".bk9100-type").val(),
-        label: $li.find(".bk9100-label").val(),
-        channels: Number($li.find(".bk9100-ch").val() || 8),
-        wordsPerChannel: Number($li.find(".bk9100-wpc").val() || 1),
-        register: $li.find(".bk9100-reg").val(),
-        pattern: $li.find(".bk9100-pattern").val()
+        type: $li.find(".bk-type").val(),
+        label: $li.find(".bk-label").val(),
+        channels: Number($li.find(".bk-ch").val() || 8),
+        wordsPerChannel: Number($li.find(".bk-wpc").val() || 1),
+        register: $li.find(".bk-reg").val(),
+        pattern: $li.find(".bk-pattern").val(),
+        settings: {
+          scalePreset: $li.find(".bk-scalePreset").val(),
+          rawMin: Number($li.find(".bk-rawMin").val() || 0),
+          rawMax: Number($li.find(".bk-rawMax").val() || 65535),
+          engMin: Number($li.find(".bk-engMin").val() || 0),
+          engMax: Number($li.find(".bk-engMax").val() || 10),
+          units: $li.find(".bk-units").val() || "",
+          decimals: Number($li.find(".bk-decimals").val() || 2),
+          deadband: Number($li.find(".bk-deadband").val() || 0),
+          filterTau: Number($li.find(".bk-filterTau").val() || 0),
+          alarmLow: $li.find(".bk-alarmLow").val(),
+          alarmHigh: $li.find(".bk-alarmHigh").val()
+        }
       });
     });
     return items;
@@ -61,8 +120,9 @@
   function renderList($list, items){
     $list.empty();
     items.forEach((c,i)=> $list.append(cardRow(i,c)));
-    $list.sortable({ handle: ".bk9100-drag", axis: "y" });
-    $list.on("click",".bk9100-del", function(){
+    $list.sortable({ handle: ".bk-drag", axis: "y" });
+    $list.on("click",".bk-del", function(e){
+      e.preventDefault();
       $(this).closest("li").remove();
     });
   }
@@ -75,8 +135,7 @@
     defaults: {
       name: { value: "" },
       baseAddress: { value: 0, validate: RED.validators.number() },
-      cards: { value: [] },
-      autoPattern: { value: true }
+      cards: { value: [] }
     },
     inputs: 1,
     outputs: function(){
@@ -85,46 +144,43 @@
     },
     outputLabels: function(i){
       const c = this.cards || [];
-      const item = c[i];
-      if (!item) return "Card " + (i+1);
-      const label = item.label ? ` — ${item.label}` : "";
-      return `${item.type}${label}`;
+      const it = c[i];
+      if (!it) return "Card " + (i+1);
+      const label = it.label ? ` — ${it.label}` : "";
+      return `${it.type}${label}`;
     },
     label: function(){ return this.name || "BK9100 Rack"; },
 
     oneditprepare: function(){
-      const self = this;
-      const $list = $("#bk9100-cards");
-      const items = (this.cards && this.cards.length) ? this.cards : [];
+      const $list = $("#bk-cards");
+      const items = Array.isArray(this.cards) ? this.cards : [];
       renderList($list, items);
-
-      $("#node-input-add").on("click", function(e){
+      $("#bk-add").on("click", function(e){
         e.preventDefault();
         const cur = readList($list);
-        cur.push({type:"KL3208", label:"", channels:8, wordsPerChannel:2, register:"input-registers", pattern:"interleaved-status-data"});
+        cur.push({type:"KL3208", label:"", channels:8, wordsPerChannel:2, register:"input-registers", pattern:"interleaved-status-data", settings:{}});
         renderList($list, cur);
       });
     },
-
     oneditsave: function(){
-      const $list = $("#bk9100-cards");
-      this.cards = readList($list);
+      this.cards = readList($("#bk-cards"));
     }
   });
 })();
 </script>
 
 <style>
-  .bk9100-wrap { margin-top: 6px; }
-  .bk9100-list { list-style: none; padding: 0; margin: 0; }
-  .bk9100-card { display: grid; grid-template-columns: 20px 36px 60px 1fr 40px 70px 140px 170px auto; gap: 6px; align-items: center; padding: 6px; border: 1px solid #e3e3e3; border-radius: 8px; margin-bottom: 8px; background: #fff; }
-  .bk9100-drag { cursor: move; color: #888; }
-  .bk9100-idx { color: #777; font-size: 0.9em; }
-  .bk9100-card label { color:#666; font-size: 0.85em; }
-  .bk9100-card input[type="text"]{ width: 100%; }
-  .bk9100-card input[type="number"]{ width: 100%; }
-  .bk9100-card select { width: 100%; }
-  .bk9100-del { background: transparent; border: none; color: #b33; }
+  .bk-wrap { margin-top: 8px; }
+  .bk-list { list-style: none; padding: 0; margin: 0; }
+  .bk-card { border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 10px; background: #fff; }
+  .bk-head { display: grid; grid-template-columns: 20px 40px 60px 140px 40px 80px 90px auto 40px; gap: 8px; align-items: center; padding: 8px; border-bottom: 1px solid #eee; }
+  .bk-row { display: grid; grid-template-columns: 80px 1fr 80px 1fr; gap: 8px; padding: 8px; }
+  .bk-idx { color: #777; }
+  .bk-drag { cursor: move; color: #888; }
+  .bk-del { background: transparent; border: none; color: #b33; }
+  .bk-adv summary { cursor: pointer; padding: 8px 12px; background: #fafafa; border-top: 1px solid #eee; }
+  .bk-grid { display: grid; grid-template-columns: 120px 1fr 120px 1fr; gap: 8px; padding: 8px 12px 12px; }
+  .bk-grid input[type="number"], .bk-grid input[type="text"], .bk-grid select { width: 100%; }
 </style>
 
 <script type="text/x-red" data-template-name="BK9100 Rack">
@@ -136,23 +192,29 @@
     <label for="node-input-baseAddress"><i class="fa fa-list-ol"></i> Base address</label>
     <input type="number" id="node-input-baseAddress" min="0" step="1" placeholder="0">
   </div>
-  <hr/>
-  <div class="bk9100-wrap">
-    <ol id="bk9100-cards" class="bk9100-list"></ol>
-    <button id="node-input-add"><i class="fa fa-plus"></i> Add card</button>
+  <div class="bk-wrap">
+    <ol id="bk-cards" class="bk-list"></ol>
+    <button id="bk-add"><i class="fa fa-plus"></i> Add card</button>
   </div>
 </script>
 
 <script type="text/x-red" data-help-name="BK9100 Rack">
-  <p><b>BK9100 Rack</b> — define your Beckhoff terminal order and emit Modbus mappings per card.</p>
-  <p>Configure the ordered list of cards. On input (any message) or on deploy, the node calculates each card’s Modbus slice and sends a config message on the matching output.</p>
-  <p><b>Output message per card</b>:</p>
+  <p><b>BK9100 Rack</b> defines your Beckhoff terminal order and emits one <i>config</i> message per card output.</p>
+  <p>Each message contains the computed Modbus slice (<code>register</code>, <code>start</code>, <code>quantity</code>) and card-specific <i>settings</i> (scaling, units, deadband, LPF τ, alarms).</p>
   <pre>{
-  type: "KL3208" | "KL3468" | "KL1808",
-  label: "optional",
+  type: "KL3208",
+  label: "Room Temps",
   channels: 8,
   modbus: { register: "input-registers", start: 0, quantity: 16, fc: 4 },
-  map: { startIndex: 1, step: 2, pattern: "interleaved-status-data" }
+  map: { startIndex: 1, step: 2, pattern: "interleaved-status-data" },
+  settings: {
+    scalePreset: "0-10V",
+    rawMin: 0, rawMax: 65535,
+    engMin: 0, engMax: 10,
+    units: "V", decimals: 2,
+    deadband: 0.05, filterTau: 2.0,
+    alarmLow: null, alarmHigh: 9.5
+  }
 }</pre>
-  <p>Wire each output to the respective card node’s input. The card nodes included here accept runtime mapping via <code>msg.map</code> (overrides <i>Start index</i> and <i>Step</i>).</p>
+  <p>Wire each output to the corresponding card node input.</p>
 </script>

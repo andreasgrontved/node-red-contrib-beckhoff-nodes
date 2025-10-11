@@ -1,4 +1,3 @@
-
 module.exports = function(RED){
   function BK9100RackNode(cfg){
     RED.nodes.createNode(this, cfg);
@@ -24,20 +23,18 @@ module.exports = function(RED){
         case "discrete-inputs": return 2;
         case "holding-registers": return 3;
         case "input-registers": return 4;
-        default: return null;
       }
+      return null;
     }
 
-    function computeSlices(){
+    function compute(){
       let cur = baseAddress;
       const out = [];
       for (const c of cards){
         const d = Object.assign({}, typeDefaults(c.type||"KL3208"), c);
         const quantity = Number(d.channels) * Number(d.wordsPerChannel);
-        const start = cur;
-        cur += quantity;
+        const start = cur; cur += quantity;
 
-        // map hints for card nodes
         const map = (d.pattern === "interleaved-status-data")
           ? { startIndex: 1, step: 2, pattern: d.pattern }
           : { startIndex: 0, step: 1, pattern: d.pattern };
@@ -47,35 +44,27 @@ module.exports = function(RED){
           label: d.label || "",
           channels: Number(d.channels),
           modbus: { register: d.register, start, quantity, fc: toFC(d.register) },
-          map
+          map,
+          settings: d.settings || {}
         });
       }
       return out;
     }
 
-    function sendAll(){
-      const slices = computeSlices();
-      const outs = slices.map(s => ({ payload: { command:"config", ...s }, config: s }));
-      // ensure outputs length
-      const max = Math.max(1, (node.outputs || slices.length));
-      while (outs.length < max) outs.push(null);
-      node.status({fill:"green", shape:"dot", text:`mapped ${slices.length} card(s) from ${baseAddress}`});
+    function emitAll(){
+      const slices = compute();
+      const outs = slices.map(s => ({
+        payload: { command: "config", ...s },
+        config: s // convenient duplicate
+      }));
+      const need = Math.max(1, (node.outputs || slices.length));
+      while (outs.length < need) outs.push(null);
+      node.status({fill:"green", shape:"dot", text:`${slices.length} card(s) from ${baseAddress}`});
       node.send(outs);
     }
 
-    // On deploy: emit once
-    setTimeout(sendAll, 25);
-
-    node.on("input", (msg, send, done) => {
-      try {
-        sendAll();
-        done && done();
-      } catch (e) {
-        node.status({fill:"red", shape:"dot", text:"error"});
-        node.error(e, msg);
-        done && done(e);
-      }
-    });
+    setTimeout(emitAll, 25);
+    node.on("input", (msg, send, done) => { try { emitAll(); done && done(); } catch(e){ node.error(e,msg); node.status({fill:"red",shape:"dot",text:"error"}); done && done(e);} });
   }
   RED.nodes.registerType("BK9100 Rack", BK9100RackNode);
 };
