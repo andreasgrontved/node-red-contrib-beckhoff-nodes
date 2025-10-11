@@ -23,7 +23,6 @@ RED.nodes.registerType('BK9100', {
     oneditprepare: function () {
         const node = this;
 
-        // ensure the hidden field exists
         if (!$("#node-input-outputs").length) {
             $('<input type="hidden" id="node-input-outputs">').appendTo("#dialog-form");
         }
@@ -39,7 +38,52 @@ RED.nodes.registerType('BK9100', {
             setOutputs(n || 1);
         }
 
-        // header
+        // Sensor type options for KL3208
+        const sensorOptions = [
+            { value: 'pt1000', label: 'Pt1000 (default)' },
+            { value: 'ni1000', label: 'Ni1000' },
+            { value: 'res_6k', label: 'Resistor 6kΩ' },
+            { value: 'res_65k', label: 'Resistor 65kΩ' },
+            { value: 'res_655k', label: 'Resistor 655kΩ' },
+            { value: 'ntc_1k8', label: 'NTC 1.8kΩ' },
+            { value: 'ntc_2k2', label: 'NTC 2.2kΩ' },
+            { value: 'ntc_3k', label: 'NTC 3kΩ' },
+            { value: 'ntc_5k', label: 'NTC 5kΩ' },
+            { value: 'ntc_10k', label: 'NTC 10kΩ' },
+            { value: 'ntc_20k', label: 'NTC 20kΩ' },
+            { value: 'ntc_100k', label: 'NTC 100kΩ' }
+        ];
+
+        function createSensorSelect(value) {
+            const select = $('<select class="node-input-sensor-type" style="width:100%"></select>');
+            sensorOptions.forEach(opt => {
+                select.append(`<option value="${opt.value}">${opt.label}</option>`);
+            });
+            if (value) select.val(value);
+            return select;
+        }
+
+        function showKL3208Config(container, config) {
+            const configDiv = $('<div class="kl3208-config" style="margin-top:8px;padding:8px;border:1px solid #ddd;border-radius:4px;background:#f9f9f9;"></div>');
+            configDiv.append('<div style="font-weight:600;margin-bottom:6px;">KL3208 Channel Configuration:</div>');
+            
+            const grid = $('<div style="display:grid;grid-template-columns:80px 1fr;gap:6px;align-items:center;"></div>');
+            
+            for (let ch = 1; ch <= 8; ch++) {
+                grid.append(`<label style="text-align:right;">Ch ${ch}:</label>`);
+                const select = createSensorSelect(config?.channels?.[ch-1] || 'pt1000');
+                select.attr('data-channel', ch-1);
+                grid.append(select);
+            }
+            
+            configDiv.append(grid);
+            container.append(configDiv);
+        }
+
+        function hideKL3208Config(container) {
+            container.find('.kl3208-config').remove();
+        }
+
         $("#bk-cards-header").empty().append(
             '<div style="display:flex;gap:6px;padding:0 6px 4px 6px;align-items:center;">' +
             '  <div style="width:160px;font-weight:600;">Type</div>' +
@@ -51,32 +95,52 @@ RED.nodes.registerType('BK9100', {
         $("#bk-cards").editableList({
             addItem: function (container, index, data) {
                 const row = $('<div class="red-ui-editableList-item-content" ' +
-                              'style="display:flex;gap:6px;align-items:center;padding:2px 6px;"></div>')
-                             .appendTo(container);
+                              'style="padding:6px;"></div>').appendTo(container);
+
+                const mainRow = $('<div style="display:flex;gap:6px;align-items:center;"></div>').appendTo(row);
 
                 // TYPE
-                const typeWrap = $('<div style="width:160px"></div>').appendTo(row);
-                $('<input type="text" class="node-input-card-type" style="width:100%" ' +
+                const typeWrap = $('<div style="width:160px"></div>').appendTo(mainRow);
+                const typeInput = $('<input type="text" class="node-input-card-type" style="width:100%" ' +
                   'placeholder="KL1808 / KL3208 / KL3468">').appendTo(typeWrap);
 
                 // LABEL
-                const labelWrap = $('<div style="width:220px"></div>').appendTo(row);
+                const labelWrap = $('<div style="width:220px"></div>').appendTo(mainRow);
                 $('<input type="text" class="node-input-card-label" style="width:100%" ' +
                   'placeholder="e.g. Inputs A">').appendTo(labelWrap);
 
                 // FILTER
-                const filterWrap = $('<div style="flex:1"></div>').appendTo(row);
+                const filterWrap = $('<div style="flex:1"></div>').appendTo(mainRow);
                 $('<input type="text" class="node-input-card-filter" style="width:100%" ' +
                   'placeholder="Exact, *wildcard*, or /regex/">').appendTo(filterWrap);
 
+                // Config container (for KL3208 specific settings)
+                const configContainer = $('<div class="card-config-container"></div>').appendTo(row);
+
+                // Show/hide KL3208 config based on type
+                typeInput.on('change keyup', function() {
+                    const type = $(this).val().trim().toUpperCase();
+                    if (type === 'KL3208') {
+                        if (!configContainer.find('.kl3208-config').length) {
+                            showKL3208Config(configContainer, data?.config);
+                        }
+                    } else {
+                        hideKL3208Config(configContainer);
+                    }
+                });
+
                 // populate
                 if (data && typeof data === "object") {
-                    row.find(".node-input-card-type").val(data.type || "");
+                    typeInput.val(data.type || "");
                     row.find(".node-input-card-label").val(data.label || "");
                     row.find(".node-input-card-filter").val(data.filter || "");
+                    
+                    // Trigger type check to show config if needed
+                    if (data.type && data.type.toUpperCase() === 'KL3208') {
+                        showKL3208Config(configContainer, data.config);
+                    }
                 }
 
-                // trigger recompute after DOM settles
                 setTimeout(recompute, 0);
             },
             removable: true,
@@ -95,7 +159,6 @@ RED.nodes.registerType('BK9100', {
         if (Array.isArray(cards) && cards.length) {
             cards.forEach(c => $("#bk-cards").editableList('addItem', c));
         } else {
-            // show a single empty row
             $("#bk-cards").editableList('addItem', { type:"KL1808", label:"", filter:"" });
         }
     },
@@ -105,11 +168,25 @@ RED.nodes.registerType('BK9100', {
         const cards = [];
         items.each(function () {
             const row = $(this);
-            cards.push({
-                type:   row.find(".node-input-card-type").val() || "",
+            const type = row.find(".node-input-card-type").val() || "";
+            const card = {
+                type:   type,
                 label:  row.find(".node-input-card-label").val() || "",
                 filter: row.find(".node-input-card-filter").val() || ""
-            });
+            };
+            
+            // Save KL3208 channel configuration
+            if (type.toUpperCase() === 'KL3208') {
+                const channels = [];
+                row.find('.node-input-sensor-type').each(function() {
+                    channels.push($(this).val());
+                });
+                if (channels.length === 8) {
+                    card.config = { channels };
+                }
+            }
+            
+            cards.push(card);
         });
         this.cards   = cards;
         const n = Math.max(1, cards.length);
@@ -132,6 +209,7 @@ RED.nodes.registerType('BK9100', {
         <i>Topic filter</i>, it supports exact (<code>KL1808</code>), wildcard (<code>KL*</code>),
         or regex (<code>/^KL3\\d{3}$/</code>). If empty, it matches the card <b>Type</b>.
         Reorder cards to change output order; the number of outputs follows the list.
+        <br><b>KL3208:</b> Configure sensor types for each of the 8 channels.
     </div>
 
     <div id="bk-cards-header"></div>
@@ -141,4 +219,6 @@ RED.nodes.registerType('BK9100', {
 <script type="text/x-red" data-help-name="BK9100">
     <p>Routes messages to one of N outputs based on <code>msg.topic</code>.
        Outputs = number of configured cards; order matches the list.</p>
+    <p>For <b>KL3208</b> cards, configure the sensor type for each channel. The node will
+       convert raw Modbus data to temperature readings in both Celsius and Fahrenheit.</p>
 </script>

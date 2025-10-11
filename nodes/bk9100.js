@@ -1,5 +1,70 @@
 module.exports = function (RED) {
 
+    // Temperature conversion profiles for KL3208
+    const SENSOR_PROFILES = {
+        'pt1000': { min: -200, max: 850, range: 1050 },      // Pt1000
+        'ni1000': { min: -60, max: 250, range: 310 },        // Ni1000
+        'res_6k': { min: 0, max: 6000, range: 6000 },        // 6kΩ resistor
+        'res_65k': { min: 0, max: 65000, range: 65000 },     // 65kΩ resistor
+        'res_655k': { min: 0, max: 655000, range: 655000 },  // 655kΩ resistor
+        'ntc_1k8': { min: -50, max: 150, range: 200 },       // NTC 1.8k
+        'ntc_2k2': { min: -50, max: 150, range: 200 },       // NTC 2.2k
+        'ntc_3k': { min: -50, max: 150, range: 200 },        // NTC 3k
+        'ntc_5k': { min: -50, max: 150, range: 200 },        // NTC 5k
+        'ntc_10k': { min: -50, max: 150, range: 200 },       // NTC 10k
+        'ntc_20k': { min: -50, max: 150, range: 200 },       // NTC 20k
+        'ntc_100k': { min: -50, max: 150, range: 200 }       // NTC 100k
+    };
+
+    function convertKL3208Data(rawArray, channelConfigs) {
+        if (!Array.isArray(rawArray) || rawArray.length !== 16) {
+            return { error: "Expected 16-element array from Modbus" };
+        }
+
+        const channels = [];
+        
+        for (let ch = 0; ch < 8; ch++) {
+            const stateIdx = ch * 2;      // 0, 2, 4, 6, 8, 10, 12, 14
+            const dataIdx = ch * 2 + 1;   // 1, 3, 5, 7, 9, 11, 13, 15
+            
+            const state = rawArray[stateIdx];
+            const rawValue = rawArray[dataIdx];
+            
+            const sensorType = channelConfigs?.[ch] || 'pt1000';
+            const profile = SENSOR_PROFILES[sensorType] || SENSOR_PROFILES['pt1000'];
+            
+            // Convert 16-bit value (0-65535) to temperature
+            // For resistor types, we output resistance instead of temperature
+            let celsius, fahrenheit, unit;
+            
+            if (sensorType.startsWith('res_')) {
+                // Resistance measurement
+                const resistance = (rawValue / 65535) * profile.max;
+                celsius = resistance;
+                fahrenheit = resistance;
+                unit = 'Ω';
+            } else {
+                // Temperature measurement
+                celsius = profile.min + (rawValue / 65535) * profile.range;
+                fahrenheit = (celsius * 9/5) + 32;
+                unit = '°C / °F';
+            }
+            
+            channels.push({
+                channel: ch + 1,
+                sensorType,
+                state,
+                rawValue,
+                celsius: Math.round(celsius * 100) / 100,
+                fahrenheit: Math.round(fahrenheit * 100) / 100,
+                unit,
+                error: (state !== 0) ? `Error code: ${state}` : null
+            });
+        }
+        
+        return { channels };
+    }
+
     function makeMatcher(filter, fallbackExact) {
         if (filter && typeof filter === "string" && filter.length) {
             // regex: /.../
@@ -24,7 +89,6 @@ module.exports = function (RED) {
         RED.nodes.createNode(this, config);
         const node = this;
 
-        // cards might arrive as string if editor serialized oddly
         let cards = config.cards;
         if (typeof cards === "string") {
             try { cards = JSON.parse(cards); } catch { cards = []; }
@@ -34,7 +98,8 @@ module.exports = function (RED) {
         const routes = cards.map(c => ({
             type:  c.type  || "",
             label: c.label || "",
-            filter:c.filter|| "",
+            filter: c.filter || "",
+            config: c.config || null,
             match: makeMatcher(c.filter || "", c.type || "")
         }));
 
@@ -47,7 +112,18 @@ module.exports = function (RED) {
                 let hits = 0;
 
                 routes.forEach((r, i) => {
-                    if (r.match(topic)) { outs[i] = msg; hits++; }
+                    if (r.match(topic)) {
+                        let outMsg = RED.util.cloneMessage(msg);
+                        
+                        // Process KL3208 data if applicable
+                        if (r.type.toUpperCase() === 'KL3208' && Array.isArray(msg.payload)) {
+                            const converted = convertKL3208Data(msg.payload, r.config?.channels);
+                            outMsg.payload = converted;
+                        }
+                        
+                        outs[i] = outMsg;
+                        hits++;
+                    }
                 });
 
                 node.status({
