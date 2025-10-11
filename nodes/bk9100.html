@@ -440,16 +440,6 @@ RED.nodes.registerType('BK9100', {
 
     <hr style="margin: 15px 0;">
 
-    <div class="form-tips" style="margin-top:8px;margin-bottom:12px;">
-        <b>Auto-addressing:</b> Cards are polled in order. Addresses auto-calculate based on card position 
-        (KL1804=4, KL1808=8, KL3204/KL3464=8, KL3208/KL3468=16 addresses). 
-        Reorder cards to match physical BK9100 configuration.
-        <br><b>Poll Rate:</b> Set individual poll rates per card (in milliseconds). Leave empty to use global poll rate. 
-        Example: Digital inputs=100ms, Temperature=5000ms.
-        <br><b>Temperature cards (KL3204/KL3208):</b> Configure sensor types for each channel.
-        <br><b>Voltage cards (KL3464/KL3468):</b> Configure voltage range and manufacturer for each channel.
-    </div>
-
     <div id="bk-cards-header"></div>
     <div class="form-row"><div id="bk-cards"></div></div>
 </script>
