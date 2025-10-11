@@ -3,6 +3,9 @@ module.exports = function(RED) {
     RED.nodes.createNode(this, cfg);
     const node = this;
 
+    // Optional mapping: startIndex and step for DI arrays
+    let MAP = { startIndex: 0, step: 1 };
+
     node.status({fill:"grey", shape:"ring", text:"waiting array"});
 
     function toBool(v) {
@@ -14,16 +17,18 @@ module.exports = function(RED) {
       return true;
     }
 
+
     function arrayToOutputs(arr, baseMsg) {
       const outs = new Array(8).fill(null);
       for (let i = 0; i < 8; i++) {
-        const raw = arr[i];
+        const idx = MAP.startIndex + i * MAP.step;
+        const raw = arr[idx];
         const b = toBool(raw);
         outs[i] = {
           ...baseMsg,
           payload: b,
           raw: raw,
-          index: i
+          index: idx
         };
       }
       return outs;
@@ -31,6 +36,23 @@ module.exports = function(RED) {
 
     node.on('input', (msg, send, done) => {
       try {
+
+        // runtime mapping config
+        if (msg && msg.config && msg.config.map) {
+          const m = msg.config.map;
+          if (Number.isFinite(m.startIndex)) MAP.startIndex = Number(m.startIndex);
+          if (Number.isFinite(m.step)) MAP.step = Number(m.step);
+          node.status({fill:"blue", shape:"dot", text:`map start=${MAP.startIndex}, step=${MAP.step}`});
+          return done && done();
+        }
+        if (msg && msg.map) {
+          const m = msg.map;
+          if (Number.isFinite(m.startIndex)) MAP.startIndex = Number(m.startIndex);
+          if (Number.isFinite(m.step)) MAP.step = Number(m.step);
+          node.status({fill:"blue", shape:"dot", text:`map start=${MAP.startIndex}, step=${MAP.step}`});
+          return done && done();
+        }
+
         // array in msg.payload
         if (Array.isArray(msg.payload)) {
           const outs = arrayToOutputs(msg.payload, { topic: msg.topic });

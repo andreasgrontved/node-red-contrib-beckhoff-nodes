@@ -16,8 +16,15 @@ module.exports = function(RED) {
     const DECIMALS    = Number(cfg.decimals || 1);
 
     // Interleaved mapping
-    const START_INDEX = Number(cfg.startIndex || 1); // first data word
-    const STEP        = Number(cfg.step || 2);       // stride between data words
+    
+// --- RUNTIME MAP OVERRIDE SUPPORT ---
+    let MAP = {
+      startIndex: Number(cfg.startIndex || 1),
+      step: Number(cfg.step || 2)
+    };
+    function getStartIndex(){ return MAP.startIndex; }
+    function getStep(){ return MAP.step; }
+// ------------------------------------
 
     node.status({fill:"grey", shape:"ring", text:"waiting array"});
 
@@ -63,7 +70,7 @@ module.exports = function(RED) {
     function arrayToOutputs(arr) {
       const outs = new Array(8).fill(null);
       for (let ch = 0; ch < 8; ch++) {
-        const idx = START_INDEX + ch * STEP;
+        const idx = getStartIndex() + ch * getStep();
         if (idx < 0 || idx >= arr.length) {
           outs[ch] = { payload: { state:"missing", raw:null, volts:null, percent:null }, index: idx };
           continue;
@@ -79,15 +86,33 @@ module.exports = function(RED) {
     }
 
     function mapSingleIndexToChannel(i) {
-      const diff = Number(i) - START_INDEX;
-      if (STEP <= 0) return -1;
-      if (diff < 0 || diff % STEP !== 0) return -1;
-      const ch = diff / STEP;
+      const diff = Number(i) - getStartIndex();
+      const step = getStep();
+      if (step <= 0) return -1;
+      if (diff < 0 || diff % step !== 0) return -1;
+      const ch = diff / step;
       return (ch >= 0 && ch < 8) ? ch : -1;
     }
 
     node.on('input', (msg, send, done) => {
       try {
+
+        // runtime mapping config
+        if (msg && msg.config && msg.config.map) {
+          const m = msg.config.map;
+          if (Number.isFinite(m.startIndex)) MAP.startIndex = Number(m.startIndex);
+          if (Number.isFinite(m.step)) MAP.step = Number(m.step);
+          node.status({fill:"blue", shape:"dot", text:`map start=${MAP.startIndex}, step=${MAP.step}`});
+          return done && done();
+        }
+        if (msg && msg.map) {
+          const m = msg.map;
+          if (Number.isFinite(m.startIndex)) MAP.startIndex = Number(m.startIndex);
+          if (Number.isFinite(m.step)) MAP.step = Number(m.step);
+          node.status({fill:"blue", shape:"dot", text:`map start=${MAP.startIndex}, step=${MAP.step}`});
+          return done && done();
+        }
+
         if (Array.isArray(msg.payload)) {
           const outs = arrayToOutputs(msg.payload);
           node.status({fill:"green", shape:"dot", text:`array → ch 1..8`});

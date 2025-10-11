@@ -1,0 +1,158 @@
+
+<script type="text/javascript">
+(function(){
+  function cardRow(i, card){
+    const type = card?.type || "KL3208";
+    const label = card?.label || "";
+    const channels = card?.channels || 8;
+    // wordsPerChannel is derived from type, but allow override
+    const wpc = card?.wordsPerChannel ?? (type === "KL1808" ? 1 : 2);
+    const reg = card?.register || (type === "KL1808" ? "discrete-inputs" : "input-registers");
+    const pattern = card?.pattern || (type === "KL1808" ? "contiguous" : "interleaved-status-data");
+    return `
+      <li class="bk9100-card" data-index="${i}">
+        <i class="fa fa-bars bk9100-drag"></i>
+        <span class="bk9100-idx">#${i+1}</span>
+        <label>Type</label>
+        <select class="bk9100-type">
+          <option ${type==="KL3208"?"selected":""}>KL3208</option>
+          <option ${type==="KL3468"?"selected":""}>KL3468</option>
+          <option ${type==="KL1808"?"selected":""}>KL1808</option>
+        </select>
+        <label>Label</label>
+        <input class="bk9100-label" type="text" placeholder="e.g. Room Temps" value="${label}">
+        <label>Ch</label>
+        <input class="bk9100-ch" type="number" min="1" max="32" step="1" value="${channels}">
+        <label>Words/Ch</label>
+        <input class="bk9100-wpc" type="number" min="1" max="8" step="1" value="${wpc}">
+        <label>Register</label>
+        <select class="bk9100-reg">
+          <option value="input-registers" ${reg==="input-registers"?"selected":""}>Input Registers (FC4)</option>
+          <option value="holding-registers" ${reg==="holding-registers"?"selected":""}>Holding Registers (FC3)</option>
+          <option value="discrete-inputs" ${reg==="discrete-inputs"?"selected":""}>Discrete Inputs (FC2)</option>
+          <option value="coils" ${reg==="coils"?"selected":""}>Coils (FC1)</option>
+        </select>
+        <label>Pattern</label>
+        <select class="bk9100-pattern">
+          <option value="contiguous" ${pattern==="contiguous"?"selected":""}>Contiguous data only</option>
+          <option value="interleaved-status-data" ${pattern==="interleaved-status-data"?"selected":""}>Interleaved status+data</option>
+        </select>
+        <button class="bk9100-del"><i class="fa fa-trash"></i></button>
+      </li>
+    `;
+  }
+
+  function readList($list){
+    const items = [];
+    $list.children("li").each(function(){
+      const $li = $(this);
+      items.push({
+        type: $li.find(".bk9100-type").val(),
+        label: $li.find(".bk9100-label").val(),
+        channels: Number($li.find(".bk9100-ch").val() || 8),
+        wordsPerChannel: Number($li.find(".bk9100-wpc").val() || 1),
+        register: $li.find(".bk9100-reg").val(),
+        pattern: $li.find(".bk9100-pattern").val()
+      });
+    });
+    return items;
+  }
+
+  function renderList($list, items){
+    $list.empty();
+    items.forEach((c,i)=> $list.append(cardRow(i,c)));
+    $list.sortable({ handle: ".bk9100-drag", axis: "y" });
+    $list.on("click",".bk9100-del", function(){
+      $(this).closest("li").remove();
+    });
+  }
+
+  RED.nodes.registerType('BK9100 Rack',{
+    category: 'Beckhoff',
+    color: '#ffd1f2',
+    icon: 'font-awesome/fa-server',
+    paletteLabel: 'BK9100 Rack',
+    defaults: {
+      name: { value: "" },
+      baseAddress: { value: 0, validate: RED.validators.number() },
+      cards: { value: [] },
+      autoPattern: { value: true }
+    },
+    inputs: 1,
+    outputs: function(){
+      const c = this.cards || [];
+      return Math.max(1, c.length);
+    },
+    outputLabels: function(i){
+      const c = this.cards || [];
+      const item = c[i];
+      if (!item) return "Card " + (i+1);
+      const label = item.label ? ` — ${item.label}` : "";
+      return `${item.type}${label}`;
+    },
+    label: function(){ return this.name || "BK9100 Rack"; },
+
+    oneditprepare: function(){
+      const self = this;
+      const $list = $("#bk9100-cards");
+      const items = (this.cards && this.cards.length) ? this.cards : [];
+      renderList($list, items);
+
+      $("#node-input-add").on("click", function(e){
+        e.preventDefault();
+        const cur = readList($list);
+        cur.push({type:"KL3208", label:"", channels:8, wordsPerChannel:2, register:"input-registers", pattern:"interleaved-status-data"});
+        renderList($list, cur);
+      });
+    },
+
+    oneditsave: function(){
+      const $list = $("#bk9100-cards");
+      this.cards = readList($list);
+    }
+  });
+})();
+</script>
+
+<style>
+  .bk9100-wrap { margin-top: 6px; }
+  .bk9100-list { list-style: none; padding: 0; margin: 0; }
+  .bk9100-card { display: grid; grid-template-columns: 20px 36px 60px 1fr 40px 70px 140px 170px auto; gap: 6px; align-items: center; padding: 6px; border: 1px solid #e3e3e3; border-radius: 8px; margin-bottom: 8px; background: #fff; }
+  .bk9100-drag { cursor: move; color: #888; }
+  .bk9100-idx { color: #777; font-size: 0.9em; }
+  .bk9100-card label { color:#666; font-size: 0.85em; }
+  .bk9100-card input[type="text"]{ width: 100%; }
+  .bk9100-card input[type="number"]{ width: 100%; }
+  .bk9100-card select { width: 100%; }
+  .bk9100-del { background: transparent; border: none; color: #b33; }
+</style>
+
+<script type="text/x-red" data-template-name="BK9100 Rack">
+  <div class="form-row">
+    <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+    <input type="text" id="node-input-name" placeholder="BK9100 Rack">
+  </div>
+  <div class="form-row">
+    <label for="node-input-baseAddress"><i class="fa fa-list-ol"></i> Base address</label>
+    <input type="number" id="node-input-baseAddress" min="0" step="1" placeholder="0">
+  </div>
+  <hr/>
+  <div class="bk9100-wrap">
+    <ol id="bk9100-cards" class="bk9100-list"></ol>
+    <button id="node-input-add"><i class="fa fa-plus"></i> Add card</button>
+  </div>
+</script>
+
+<script type="text/x-red" data-help-name="BK9100 Rack">
+  <p><b>BK9100 Rack</b> — define your Beckhoff terminal order and emit Modbus mappings per card.</p>
+  <p>Configure the ordered list of cards. On input (any message) or on deploy, the node calculates each card’s Modbus slice and sends a config message on the matching output.</p>
+  <p><b>Output message per card</b>:</p>
+  <pre>{
+  type: "KL3208" | "KL3468" | "KL1808",
+  label: "optional",
+  channels: 8,
+  modbus: { register: "input-registers", start: 0, quantity: 16, fc: 4 },
+  map: { startIndex: 1, step: 2, pattern: "interleaved-status-data" }
+}</pre>
+  <p>Wire each output to the respective card node’s input. The card nodes included here accept runtime mapping via <code>msg.map</code> (overrides <i>Start index</i> and <i>Step</i>).</p>
+</script>

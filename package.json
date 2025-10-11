@@ -8,7 +8,8 @@
     "nodes": {
       "KL3468": "nodes/kl3468.js",
       "KL1808": "nodes/kl1808.js",
-      "KL3208": "nodes/kl3208.js"
+      "KL3208": "nodes/kl3208.js",
+      "BK9100": "nodes/bk9100-rack.js"
     }
   }
 }
