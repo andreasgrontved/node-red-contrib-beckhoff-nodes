@@ -1,21 +1,19 @@
 <script type="text/javascript">
 RED.nodes.registerType('BK9100', {
-    category: 'Beckhoff',          // <-- its own library section
+    category: 'Beckhoff',
     paletteLabel: 'BK9100',
     color: '#C7E9FF',
     icon: 'bridge.svg',
 
-    /* ---- editor-stored properties ---- */
     defaults: {
-        name:  { value: "" },
-        cards: { value: [] },      // [{type,label,filter}]
-        outputs: { value: 1 }      // keep NR UI in sync (like floor-heating)
+        name:   { value: "" },
+        cards:  { value: [] },      // [{type,label,filter}]
+        outputs:{ value: 1 }        // persisted output count
     },
 
     inputs: 1,
-    outputs: 1,                    // will be updated live in oneditprepare
-
-    label: function () { return this.name || 'BK9100'; },
+    outputs: 1,                     // editor will overwrite at runtime
+    label: function () { return this.name || "BK9100"; },
     outputLabels: function (i) {
         const c = (this.cards || [])[i];
         return c ? (c.label || c.type || `Out ${i+1}`) : `Out ${i+1}`;
@@ -24,38 +22,36 @@ RED.nodes.registerType('BK9100', {
     oneditprepare: function () {
         const node = this;
 
-        function syncOutputs() {
-            const n = $("#bk-cards").editableList('items').length || 1;
-            // mirror the pattern from your floor-heating node:
-            node.outputs                 = n;
-            node.outputsType             = 'num';
-            node.defaults.outputs        = { value: n };
-            // no hidden #node-input-outputs needed when you set these
+        function setOutputs(n){
+            const v = Math.max(1, n|0);
+            // this hidden field is what Node-RED persists on Deploy
+            $("#node-input-outputs").val(v).trigger("change");
+            // keep the live editor widget in sync (optional, but nice)
+            node.outputs = v;
+            node.defaults.outputs = { value: v };
+        }
+
+        function recompute(){
+            const n = $("#bk-cards").editableList('items').length;
+            setOutputs(n);
         }
 
         $("#bk-cards").editableList({
             addItem: function (container, index, data) {
-                const row = $('<div class="form-row" style="display:flex;gap:8px;align-items:center;"></div>').appendTo(container);
+                // Simple, reliable layout (no flex issues)
+                const row = $('<div class="form-row"></div>').appendTo(container);
 
-                const typeSel = $('<select/>', { class:"node-input-card-type", style:"width:180px" })
+                const typeSel = $('<select class="node-input-card-type" style="width:180px;margin-right:6px"></select>')
                     .append('<option value="KL1808">KL1808</option>')
                     .append('<option value="KL3208">KL3208</option>')
                     .append('<option value="KL3468">KL3468</option>')
                     .appendTo(row);
 
-                $('<input/>', {
-                    class: "node-input-card-label",
-                    type: "text",
-                    placeholder: "e.g. Inputs A",
-                    style: "flex:1"
-                }).appendTo(row);
+                $('<input type="text" class="node-input-card-label" style="width:220px;margin-right:6px" placeholder="Label (e.g. Inputs A)">')
+                    .appendTo(row);
 
-                $('<input/>', {
-                    class: "node-input-card-filter",
-                    type: "text",
-                    placeholder: "Exact, *wildcard*, or /regex/",
-                    style: "width:260px"
-                }).appendTo(row);
+                $('<input type="text" class="node-input-card-filter" style="width:260px" placeholder="Exact, *wildcard*, or /regex/">')
+                    .appendTo(row);
 
                 if (data) {
                     typeSel.val(data.type || "KL1808");
@@ -67,47 +63,54 @@ RED.nodes.registerType('BK9100', {
             sortable: true,
             height: "auto",
             addButton: "Add card",
-            sortItems: syncOutputs,
-            removeItem: syncOutputs,
-            addItemBefore: syncOutputs,
-            addItem: function(){ syncOutputs(); }
+            sortItems: recompute,
+            removeItem: recompute,
+            addItemBefore: recompute,
+            // called after addItem finishes rendering the controls
+            addItem: function(){ recompute(); }
         });
 
         // load saved cards
         (node.cards || []).forEach(c => $("#bk-cards").editableList('addItem', c));
-        syncOutputs();
+        recompute();
     },
 
     oneditsave: function () {
-        // collect cards in the current order
+        // collect cards in current order
         const items = $("#bk-cards").editableList('items');
         const cards = [];
         items.each(function () {
             const row = $(this);
             cards.push({
-                type:  row.find(".node-input-card-type").val() || "",
-                label: row.find(".node-input-card-label").val() || "",
-                filter:row.find(".node-input-card-filter").val() || ""
+                type:   row.find(".node-input-card-type").val() || "",
+                label:  row.find(".node-input-card-label").val() || "",
+                filter: row.find(".node-input-card-filter").val() || ""
             });
         });
-        this.cards   = cards;
-        this.outputs = Math.max(1, cards.length);   // same as your floor-heating pattern
+        this.cards = cards;
+
+        const n = Math.max(1, cards.length);
+        this.outputs = n;                               // runtime/editor object
+        $("#node-input-outputs").val(n).trigger("change"); // persisted value
     }
 });
 </script>
 
 <script type="text/x-red" data-template-name="BK9100">
+    <!-- IMPORTANT: this hidden field is what survives Deploy -->
+    <input type="hidden" id="node-input-outputs">
+
     <div class="form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
         <input type="text" id="node-input-name" placeholder="BK9100">
     </div>
 
     <div class="form-tips" style="margin-top:8px">
-        <b>Routing:</b> incoming <code>msg.topic</code> is matched per card.
+        <b>Routing:</b> <code>msg.topic</code> is matched per card.
         If a card has a <i>Topic filter</i>, it supports exact (<code>KL1808</code>),
-        wildcard (<code>KL*</code>) or regex (<code>/^KL3\d{3}$/</code>). If empty,
-        the card matches when <code>msg.topic</code> equals the card <b>Type</b>.
-        Reorder cards to change output order; the number of outputs follows the list.
+        wildcard (<code>KL*</code>), or regex (<code>/^KL3\\d{3}$/</code>).
+        If empty, it matches the card <b>Type</b>. Reorder cards to change output order;
+        the number of outputs follows the list.
     </div>
 
     <div class="form-row" style="margin-top:8px">
@@ -118,5 +121,5 @@ RED.nodes.registerType('BK9100', {
 
 <script type="text/x-red" data-help-name="BK9100">
     <p>Routes messages to one of N outputs based on <code>msg.topic</code>.
-       Number and order of outputs = number and order of configured cards.</p>
+       Outputs = number of configured cards; order matches the list.</p>
 </script>
