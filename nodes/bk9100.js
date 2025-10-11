@@ -1,19 +1,10 @@
 module.exports = function (RED) {
 
-    // Temperature conversion profiles for KL3208
-    const SENSOR_PROFILES = {
-        'pt1000': { min: -200, max: 850, range: 1050 },      // Pt1000
-        'ni1000': { min: -60, max: 250, range: 310 },        // Ni1000
-        'res_6k': { min: 0, max: 6000, range: 6000 },        // 6kΩ resistor
-        'res_65k': { min: 0, max: 65000, range: 65000 },     // 65kΩ resistor
-        'res_655k': { min: 0, max: 655000, range: 655000 },  // 655kΩ resistor
-        'ntc_1k8': { min: -50, max: 150, range: 200 },       // NTC 1.8k
-        'ntc_2k2': { min: -50, max: 150, range: 200 },       // NTC 2.2k
-        'ntc_3k': { min: -50, max: 150, range: 200 },        // NTC 3k
-        'ntc_5k': { min: -50, max: 150, range: 200 },        // NTC 5k
-        'ntc_10k': { min: -50, max: 150, range: 200 },       // NTC 10k
-        'ntc_20k': { min: -50, max: 150, range: 200 },       // NTC 20k
-        'ntc_100k': { min: -50, max: 150, range: 200 }       // NTC 100k
+    // State meanings for KL3208
+    const STATE_MESSAGES = {
+        0: "OK - Sensor connected",
+        65: "No sensor connected",
+        66: "Unconfigured"
     };
 
     function convertKL3208Data(rawArray, channelConfigs) {
@@ -28,38 +19,56 @@ module.exports = function (RED) {
             const dataIdx = ch * 2 + 1;   // 1, 3, 5, 7, 9, 11, 13, 15
             
             const state = rawArray[stateIdx];
-            const rawValue = rawArray[dataIdx];
+            let rawValue = rawArray[dataIdx];
             
             const sensorType = channelConfigs?.[ch] || 'pt1000';
-            const profile = SENSOR_PROFILES[sensorType] || SENSOR_PROFILES['pt1000'];
             
-            // Convert 16-bit value (0-65535) to temperature
-            // For resistor types, we output resistance instead of temperature
-            let celsius, fahrenheit, unit;
-            
-            if (sensorType.startsWith('res_')) {
-                // Resistance measurement
-                const resistance = (rawValue / 65535) * profile.max;
-                celsius = resistance;
-                fahrenheit = resistance;
-                unit = 'Ω';
-            } else {
-                // Temperature measurement
-                celsius = profile.min + (rawValue / 65535) * profile.range;
-                fahrenheit = (celsius * 9/5) + 32;
-                unit = '°C / °F';
+            // Convert signed 16-bit integer
+            // Positive values: 0-32767 (as-is)
+            // Negative values: 32768-65535 (convert from two's complement)
+            if (rawValue > 32767) {
+                rawValue = rawValue - 65536;
             }
             
-            channels.push({
+            // Raw value is in hundredths of a degree (divide by 100)
+            // 2400 = 24.00°C, 600 = 6.00°C, -1500 = -15.00°C
+            let celsius, fahrenheit, unit, resistance;
+            
+            if (sensorType.startsWith('res_')) {
+                // Resistance measurement (in hundredths of ohms)
+                resistance = rawValue / 100;
+                celsius = null;
+                fahrenheit = null;
+                unit = 'Ω';
+            } else {
+                // Temperature measurement (in hundredths of degrees)
+                celsius = rawValue / 100;
+                fahrenheit = (celsius * 9/5) + 32;
+                unit = '°C / °F';
+                resistance = null;
+            }
+            
+            const stateMessage = STATE_MESSAGES[state] || `Unknown state: ${state}`;
+            
+            const channelData = {
                 channel: ch + 1,
                 sensorType,
                 state,
+                stateMessage,
                 rawValue,
-                celsius: Math.round(celsius * 100) / 100,
-                fahrenheit: Math.round(fahrenheit * 100) / 100,
-                unit,
-                error: (state !== 0) ? `Error code: ${state}` : null
-            });
+                ok: state === 0
+            };
+            
+            if (resistance !== null) {
+                channelData.resistance = Math.round(resistance * 100) / 100;
+                channelData.unit = unit;
+            } else {
+                channelData.celsius = Math.round(celsius * 100) / 100;
+                channelData.fahrenheit = Math.round(fahrenheit * 100) / 100;
+                channelData.unit = unit;
+            }
+            
+            channels.push(channelData);
         }
         
         return { channels };
