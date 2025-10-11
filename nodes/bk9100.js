@@ -16,87 +16,6 @@ module.exports = function (RED) {
         66: "Unconfigured"
     };
 
-    function convertKL3468Data(rawArray, channelConfigs) {
-        if (!Array.isArray(rawArray) || rawArray.length !== 16) {
-            return { error: "Expected 16-element array from Modbus" };
-        }
-
-        const channels = [];
-        
-        for (let ch = 0; ch < 8; ch++) {
-            const stateIdx = ch * 2;      // 0, 2, 4, 6, 8, 10, 12, 14
-            const dataIdx = ch * 2 + 1;   // 1, 3, 5, 7, 9, 11, 13, 15
-            
-            const state = rawArray[stateIdx];
-            let rawValue = rawArray[dataIdx];
-            
-            const config = channelConfigs?.[ch] || { range: '0-10', manufacturer: 'generic' };
-            const range = config.range || '0-10';
-            const manufacturer = config.manufacturer || 'generic';
-            
-            // Convert signed 16-bit integer
-            if (rawValue > 32767) {
-                rawValue = rawValue - 65536;
-            }
-            
-            // Convert raw value to voltage (32767 = 10V)
-            const voltage = (rawValue / 32767) * 10;
-            
-            // Determine range parameters
-            let minV, maxV, zeroRaw, adaptationRaw;
-            switch(range) {
-                case '0.5-10':
-                    minV = 0.5;
-                    maxV = 10;
-                    zeroRaw = 1638;  // 0.5V in raw units
-                    adaptationRaw = 1648;  // Belimo adaptation value
-                    break;
-                case '2-10':
-                    minV = 2;
-                    maxV = 10;
-                    zeroRaw = 6554;  // 2V in raw units
-                    adaptationRaw = null;
-                    break;
-                default: // '0-10'
-                    minV = 0;
-                    maxV = 10;
-                    zeroRaw = 0;
-                    adaptationRaw = null;
-            }
-            
-            // Calculate percentage (0-100%)
-            let percentage;
-            if (voltage < minV) {
-                percentage = 0;
-            } else if (voltage > maxV) {
-                percentage = 100;
-            } else {
-                percentage = ((voltage - minV) / (maxV - minV)) * 100;
-            }
-            
-            // Build channel data
-            const channelData = {
-                channel: ch + 1,
-                state,
-                rawValue,
-                voltage: Math.round(voltage * 100) / 100,
-                percentage: Math.round(percentage * 10) / 10,
-                range,
-                manufacturer
-            };
-            
-            // Only include adaptationMode for Belimo with 0.5-10V range
-            if (manufacturer === 'belimo' && range === '0.5-10') {
-                const adaptationMode = Math.abs(rawValue - adaptationRaw) < 10;
-                channelData.adaptationMode = adaptationMode;
-            }
-            
-            channels.push(channelData);
-        }
-        
-        return { channels };
-    }
-
     function convertKL1808Data(rawArray) {
         if (!Array.isArray(rawArray) || rawArray.length !== 8) {
             return { error: "Expected 8-element array from Modbus" };
@@ -122,8 +41,8 @@ module.exports = function (RED) {
         const channels = [];
         
         for (let ch = 0; ch < 8; ch++) {
-            const stateIdx = ch * 2;      // 0, 2, 4, 6, 8, 10, 12, 14
-            const dataIdx = ch * 2 + 1;   // 1, 3, 5, 7, 9, 11, 13, 15
+            const stateIdx = ch * 2;
+            const dataIdx = ch * 2 + 1;
             
             const state = rawArray[stateIdx];
             let rawValue = rawArray[dataIdx];
@@ -131,14 +50,11 @@ module.exports = function (RED) {
             const sensorType = channelConfigs?.[ch] || 'pt1000';
             
             // Convert signed 16-bit integer
-            // Positive values: 0-32767 (as-is)
-            // Negative values: 32768-65535 (convert from two's complement)
             if (rawValue > 32767) {
                 rawValue = rawValue - 65536;
             }
             
             // Raw value is in hundredths of a degree (divide by 100)
-            // 2400 = 24.00°C, 600 = 6.00°C, -1500 = -15.00°C
             let celsius, fahrenheit, unit, resistance;
             
             if (sensorType.startsWith('res_')) {
@@ -173,6 +89,84 @@ module.exports = function (RED) {
                 channelData.celsius = Math.round(celsius * 100) / 100;
                 channelData.fahrenheit = Math.round(fahrenheit * 100) / 100;
                 channelData.unit = unit;
+            }
+            
+            channels.push(channelData);
+        }
+        
+        return { channels };
+    }
+
+    function convertKL3468Data(rawArray, channelConfigs) {
+        if (!Array.isArray(rawArray) || rawArray.length !== 16) {
+            return { error: "Expected 16-element array from Modbus" };
+        }
+
+        const channels = [];
+        
+        for (let ch = 0; ch < 8; ch++) {
+            const stateIdx = ch * 2;
+            const dataIdx = ch * 2 + 1;
+            
+            const state = rawArray[stateIdx];
+            let rawValue = rawArray[dataIdx];
+            
+            const config = channelConfigs?.[ch] || { range: '0-10', manufacturer: 'generic' };
+            const range = config.range || '0-10';
+            const manufacturer = config.manufacturer || 'generic';
+            
+            // Convert signed 16-bit integer
+            if (rawValue > 32767) {
+                rawValue = rawValue - 65536;
+            }
+            
+            // Convert raw value to voltage (32767 = 10V)
+            const voltage = (rawValue / 32767) * 10;
+            
+            // Determine range parameters
+            let minV, maxV, adaptationRaw;
+            switch(range) {
+                case '0.5-10':
+                    minV = 0.5;
+                    maxV = 10;
+                    adaptationRaw = 1648;
+                    break;
+                case '2-10':
+                    minV = 2;
+                    maxV = 10;
+                    adaptationRaw = null;
+                    break;
+                default: // '0-10'
+                    minV = 0;
+                    maxV = 10;
+                    adaptationRaw = null;
+            }
+            
+            // Calculate percentage (0-100%)
+            let percentage;
+            if (voltage < minV) {
+                percentage = 0;
+            } else if (voltage > maxV) {
+                percentage = 100;
+            } else {
+                percentage = ((voltage - minV) / (maxV - minV)) * 100;
+            }
+            
+            // Build channel data
+            const channelData = {
+                channel: ch + 1,
+                state,
+                rawValue,
+                voltage: Math.round(voltage * 100) / 100,
+                percentage: Math.round(percentage * 10) / 10,
+                range,
+                manufacturer
+            };
+            
+            // Only include adaptationMode for Belimo with 0.5-10V range
+            if (manufacturer === 'belimo' && range === '0.5-10') {
+                const adaptationMode = Math.abs(rawValue - adaptationRaw) < 10;
+                channelData.adaptationMode = adaptationMode;
             }
             
             channels.push(channelData);
@@ -217,19 +211,22 @@ module.exports = function (RED) {
         
         cards.forEach(c => {
             const type = (c.type || "").toUpperCase();
-            const size = CARD_SIZES[type] || 0;
+            const cardInfo = CARD_INFO[type];
             
-            routes.push({
-                type: type,
-                label: c.label || "",
-                filter: c.filter || "",
-                config: c.config || null,
-                startAddress: currentAddress,
-                size: size,
-                match: makeMatcher(c.filter || "", c.type || "")
-            });
-            
-            currentAddress += size;
+            if (cardInfo) {
+                routes.push({
+                    type: type,
+                    label: c.label || "",
+                    filter: c.filter || "",
+                    config: c.config || null,
+                    startAddress: currentAddress,
+                    size: cardInfo.size,
+                    functionCode: cardInfo.fc,
+                    match: makeMatcher(c.filter || "", c.type || "")
+                });
+                
+                currentAddress += cardInfo.size;
+            }
         });
 
         // Modbus connection settings
@@ -298,19 +295,30 @@ module.exports = function (RED) {
             for (let i = 0; i < routes.length; i++) {
                 const route = routes[i];
                 
-                if (route.size === 0) {
-                    // Unknown card type, skip
+                if (!route.size) {
                     continue;
                 }
 
                 try {
-                    // Read input registers for this card
-                    const response = await client.readInputRegisters(
-                        route.startAddress, 
-                        route.size
-                    );
+                    let response;
+                    let data;
                     
-                    const data = response.response._body._valuesAsArray;
+                    // Use appropriate function code based on card type
+                    if (route.functionCode === 'readCoils') {
+                        // FC2 for digital inputs (KL1808)
+                        response = await client.readDiscreteInputs(
+                            route.startAddress, 
+                            route.size
+                        );
+                        data = response.response._body._valuesAsArray;
+                    } else {
+                        // FC4 for analog inputs (KL3208, KL3468)
+                        response = await client.readInputRegisters(
+                            route.startAddress, 
+                            route.size
+                        );
+                        data = response.response._body._valuesAsArray;
+                    }
                     
                     // Process based on card type
                     let payload;
@@ -321,7 +329,7 @@ module.exports = function (RED) {
                     } else if (route.type === 'KL3468') {
                         payload = convertKL3468Data(data, route.config?.channels);
                     } else {
-                        payload = data; // Unknown card, pass raw data
+                        payload = data;
                     }
                     
                     outs[i] = {
