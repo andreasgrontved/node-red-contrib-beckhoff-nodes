@@ -15,7 +15,7 @@ RED.nodes.registerType('BK9100', {
         outputs: { value: 1 }
     },
 
-    inputs: 1,
+    inputs: 0,
     outputs: 1,
 
     label: function () { return this.name || "BK9100"; },
@@ -128,6 +128,10 @@ RED.nodes.registerType('BK9100', {
             container.append(configDiv);
         }
 
+        function hideKL3208Config(container) {
+            container.find('.kl3208-config').remove();
+        }
+
         function showKL3468Config(container, config) {
             const configDiv = $('<div class="kl3468-config" style="margin-top:8px;padding:8px;border:1px solid #ddd;border-radius:4px;background:#f9f9f9;"></div>');
             
@@ -166,6 +170,7 @@ RED.nodes.registerType('BK9100', {
             container.find('.kl3468-config').remove();
         }
 
+        // header
         $("#bk-cards-header").empty().append(
             '<div style="display:flex;gap:6px;padding:0 6px 4px 6px;align-items:center;">' +
             '  <div style="width:160px;font-weight:600;">Type</div>' +
@@ -194,9 +199,9 @@ RED.nodes.registerType('BK9100', {
                 // FILTER
                 const filterWrap = $('<div style="flex:1"></div>').appendTo(mainRow);
                 $('<input type="text" class="node-input-card-filter" style="width:100%" ' +
-                  'placeholder="Exact, *wildcard*, or /regex/">').appendTo(filterWrap);
+                  'placeholder="Optional - leave empty to auto-match">').appendTo(filterWrap);
 
-                // Config container (for KL3208 specific settings)
+                // Config container (for KL3208/KL3468 specific settings)
                 const configContainer = $('<div class="card-config-container"></div>').appendTo(row);
 
                 // Show/hide card-specific config based on type
@@ -316,11 +321,34 @@ RED.nodes.registerType('BK9100', {
         <input type="text" id="node-input-name" placeholder="BK9100">
     </div>
 
-    <div class="form-tips" style="margin-top:8px">
-        <b>Routing:</b> <code>msg.topic</code> is matched per card. If a card has a
-        <i>Topic filter</i>, it supports exact (<code>KL1808</code>), wildcard (<code>KL*</code>),
-        or regex (<code>/^KL3\\d{3}$/</code>). If empty, it matches the card <b>Type</b>.
-        Reorder cards to change output order; the number of outputs follows the list.
+    <hr style="margin: 15px 0;">
+
+    <div class="form-row">
+        <label for="node-input-host"><i class="fa fa-globe"></i> IP Address</label>
+        <input type="text" id="node-input-host" placeholder="192.168.1.100">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-port"><i class="fa fa-plug"></i> Port</label>
+        <input type="number" id="node-input-port" placeholder="502" style="width:100px">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-unitId"><i class="fa fa-hashtag"></i> Unit ID</label>
+        <input type="number" id="node-input-unitId" placeholder="1" style="width:100px">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-pollInterval"><i class="fa fa-clock-o"></i> Poll Rate</label>
+        <input type="number" id="node-input-pollInterval" placeholder="1000" style="width:100px">
+        <span style="margin-left:5px">ms</span>
+    </div>
+
+    <hr style="margin: 15px 0;">
+
+    <div class="form-tips" style="margin-top:8px;margin-bottom:12px;">
+        <b>Auto-addressing:</b> Cards are polled in order. Addresses auto-calculate based on card position 
+        (KL1808=8 addr, KL3208/KL3468=16 addr). Reorder cards to match physical BK9100 configuration.
         <br><b>KL3208:</b> Configure sensor types for each of the 8 channels.
         <br><b>KL3468:</b> Configure voltage range and manufacturer for each of the 8 channels.
     </div>
@@ -330,8 +358,7 @@ RED.nodes.registerType('BK9100', {
 </script>
 
 <script type="text/x-red" data-help-name="BK9100">
-    <p>Routes messages to one of N outputs based on <code>msg.topic</code>.
-       Outputs = number of configured cards; order matches the list.</p>
+    <p>Polls Beckhoff BK9100 bus coupler via Modbus TCP and routes data to outputs based on card configuration.</p>
     <p><b>KL1808:</b> 8 digital inputs, outputs boolean values per channel.</p>
     <p><b>KL3208:</b> 8 analog temperature inputs. Configure the sensor type for each channel. 
        The node converts raw Modbus data to temperature readings in both Celsius and Fahrenheit.</p>
