@@ -265,6 +265,13 @@ module.exports = function (RED) {
         let pollTimer = null;
         let reconnectTimer = null;
 
+        // Log card configuration for debugging
+        node.log(`Configured ${routes.length} cards with poll rates:`);
+        routes.forEach((r, i) => {
+            const rate = r.pollRate || pollInterval;
+            node.log(`  Card ${i+1} (${r.type}): ${rate}ms`);
+        });
+
         node.status({ fill: "grey", shape: "ring", text: "connecting..." });
 
         // Connect to Modbus TCP
@@ -315,6 +322,7 @@ module.exports = function (RED) {
                 return;
             }
 
+            const now = Date.now();
             const outs = new Array(routes.length).fill(null);
 
             for (let i = 0; i < routes.length; i++) {
@@ -322,6 +330,12 @@ module.exports = function (RED) {
                 
                 if (!route.size) {
                     continue;
+                }
+
+                // Check if this card needs polling based on its individual rate
+                const cardPollRate = route.pollRate || pollInterval;
+                if (now - route.lastPoll < cardPollRate) {
+                    continue; // Skip this card, not time yet
                 }
 
                 try {
@@ -375,6 +389,8 @@ module.exports = function (RED) {
                         payload: payload
                     };
                     
+                    route.lastPoll = now; // Update last poll time
+                    
                 } catch (err) {
                     node.warn(`Error reading ${route.type} at address ${route.startAddress}: ${err.message}`);
                     outs[i] = {
@@ -384,13 +400,26 @@ module.exports = function (RED) {
                 }
             }
 
-            // Send to all outputs
+            // Send to all outputs (null for cards that weren't polled this time)
             node.send(outs);
         }
 
         function startPolling() {
             if (pollTimer) clearInterval(pollTimer);
-            pollTimer = setInterval(pollCards, pollInterval);
+            
+            // Find the fastest poll rate among all cards (use global as default)
+            let fastestRate = pollInterval;
+            routes.forEach(r => {
+                const cardRate = r.pollRate || pollInterval;
+                if (cardRate < fastestRate) {
+                    fastestRate = cardRate;
+                }
+            });
+            
+            // Minimum poll rate is 50ms
+            fastestRate = Math.max(50, fastestRate);
+            
+            pollTimer = setInterval(pollCards, fastestRate);
             pollCards(); // Poll immediately
         }
 
