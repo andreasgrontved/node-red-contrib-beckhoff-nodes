@@ -149,9 +149,9 @@ RED.nodes.registerType('BK9100', {
             const numChannels = config && config.numChannels ? config.numChannels : 8;
             
             // Channel sensor selections
-            const channelGrid = $('<div style="display:grid;grid-template-columns:80px 1fr;gap:6px;align-items:center;margin-bottom:10px;"></div>');
+            const channelGrid = $('<div style="display:grid;grid-template-columns:100px 1fr;gap:6px;align-items:center;margin-bottom:10px;"></div>');
             for (let ch = 1; ch <= numChannels; ch++) {
-                channelGrid.append('<label style="text-align:right;">Ch ' + ch + ':</label>');
+                channelGrid.append('<label style="text-align:left;">Channel ' + ch + ':</label>');
                 const channelConfig = config && config.channels ? config.channels[ch-1] : 'pt1000';
                 const select = createSensorSelect(channelConfig);
                 select.attr('data-channel', ch-1);
