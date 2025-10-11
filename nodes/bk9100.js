@@ -208,26 +208,37 @@ module.exports = function (RED) {
         if (!Array.isArray(cards)) cards = [];
 
         // Calculate address offsets for each card
+        // Important: FC2 (digital) and FC4 (analog) have separate address spaces
         const routes = [];
-        let currentAddress = 0;
+        let digitalAddress = 0;  // For FC2 (KL1808)
+        let analogAddress = 0;   // For FC4 (KL3208, KL3468)
         
         cards.forEach(c => {
             const type = (c.type || "").toUpperCase();
             const cardInfo = CARD_INFO[type];
             
             if (cardInfo) {
+                let startAddress;
+                
+                // Separate address spaces for digital vs analog
+                if (cardInfo.fc === 'readCoils') {
+                    startAddress = digitalAddress;
+                    digitalAddress += cardInfo.size;
+                } else {
+                    startAddress = analogAddress;
+                    analogAddress += cardInfo.size;
+                }
+                
                 routes.push({
                     type: type,
                     label: c.label || "",
                     filter: c.filter || "",
                     config: c.config || null,
-                    startAddress: currentAddress,
+                    startAddress: startAddress,
                     size: cardInfo.size,
                     functionCode: cardInfo.fc,
                     match: makeMatcher(c.filter || "", c.type || "")
                 });
-                
-                currentAddress += cardInfo.size;
             }
         });
 
