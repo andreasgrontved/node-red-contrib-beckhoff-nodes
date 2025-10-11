@@ -109,7 +109,6 @@ RED.nodes.registerType('BK9100', {
             
             const content = $('<div class="config-content" style="display:none;margin-top:6px;"></div>');
             
-            // Poll rate setting
             const pollRow = $('<div style="display:flex;gap:6px;align-items:center;"></div>');
             pollRow.append('<label style="font-weight:600;">Poll Rate (ms):</label>');
             const pollInput = $('<input type="number" class="node-input-card-poll" style="width:120px;" placeholder="Use global" min="100" step="100">');
@@ -148,7 +147,6 @@ RED.nodes.registerType('BK9100', {
             
             const numChannels = config && config.numChannels ? config.numChannels : 8;
             
-            // Channel sensor selections
             const channelGrid = $('<div style="display:grid;grid-template-columns:100px 1fr;gap:6px;align-items:center;margin-bottom:10px;"></div>');
             for (let ch = 1; ch <= numChannels; ch++) {
                 channelGrid.append('<label style="text-align:left;">Channel ' + ch + ':</label>');
@@ -159,7 +157,6 @@ RED.nodes.registerType('BK9100', {
             }
             grid.append(channelGrid);
             
-            // Poll rate setting
             const pollRow = $('<div style="display:flex;gap:6px;align-items:center;padding-top:8px;border-top:1px solid #ddd;"></div>');
             pollRow.append('<label style="font-weight:600;">Poll Rate (ms):</label>');
             const pollInput = $('<input type="number" class="node-input-card-poll" style="width:120px;" placeholder="Use global" min="100" step="100">');
@@ -195,22 +192,38 @@ RED.nodes.registerType('BK9100', {
             header.append(icon, title);
             configDiv.append(header);
             
-            const grid = $('<div class="channel-grid" style="display:none;grid-template-columns:60px 140px 140px;gap:6px;align-items:center;margin-top:6px;"></div>');
+            const grid = $('<div class="channel-grid" style="display:none;margin-top:6px;"></div>');
             
             const numChannels = config && config.numChannels ? config.numChannels : 8;
             
+            const channelGrid = $('<div style="margin-bottom:10px;"></div>');
             for (let ch = 1; ch <= numChannels; ch++) {
-                grid.append('<label style="text-align:right;">Ch ' + ch + ':</label>');
+                const rowDiv = $('<div style="display:grid;grid-template-columns:100px 1fr 1fr;gap:6px;align-items:center;margin-bottom:4px;"></div>');
+                
+                rowDiv.append('<label style="text-align:left;">Channel ' + ch + ':</label>');
                 
                 const channelConfig = config && config.channels && config.channels[ch-1] ? config.channels[ch-1] : {};
                 const rangeSelect = createRangeSelect(channelConfig.range || '0-10');
                 rangeSelect.attr('data-channel', ch-1);
-                grid.append(rangeSelect);
+                rowDiv.append(rangeSelect);
                 
                 const mfgSelect = createManufacturerSelect(channelConfig.manufacturer || 'generic');
                 mfgSelect.attr('data-channel', ch-1);
-                grid.append(mfgSelect);
+                rowDiv.append(mfgSelect);
+                
+                channelGrid.append(rowDiv);
             }
+            grid.append(channelGrid);
+            
+            const pollRow = $('<div style="display:flex;gap:6px;align-items:center;padding-top:8px;border-top:1px solid #ddd;"></div>');
+            pollRow.append('<label style="font-weight:600;">Poll Rate (ms):</label>');
+            const pollInput = $('<input type="number" class="node-input-card-poll" style="width:120px;" placeholder="Use global" min="100" step="100">');
+            if (config && config.pollRate) {
+                pollInput.val(config.pollRate);
+            }
+            pollRow.append(pollInput);
+            pollRow.append('<span style="color:#666;font-size:0.9em;margin-left:8px;">Leave empty to use global poll rate</span>');
+            grid.append(pollRow);
             
             grid.attr('data-num-channels', numChannels);
             configDiv.append(grid);
@@ -257,7 +270,6 @@ RED.nodes.registerType('BK9100', {
                 typeInput.on('change keyup', function() {
                     const type = $(this).val().trim().toUpperCase();
                     
-                    // Handle KL1804/KL1808 (digital - just poll rate)
                     if (type === 'KL1804' || type === 'KL1808') {
                         hideKL3208Config(configContainer);
                         hideKL3468Config(configContainer);
@@ -269,7 +281,6 @@ RED.nodes.registerType('BK9100', {
                         hideKL1808Config(configContainer);
                     }
                     
-                    // Handle KL3204/KL3208 (temperature)
                     if (type === 'KL3204' || type === 'KL3208') {
                         hideKL1808Config(configContainer);
                         hideKL3468Config(configContainer);
@@ -283,7 +294,6 @@ RED.nodes.registerType('BK9100', {
                         hideKL3208Config(configContainer);
                     }
                     
-                    // Handle KL3464/KL3468 (voltage)
                     if (type === 'KL3464' || type === 'KL3468') {
                         hideKL1808Config(configContainer);
                         hideKL3208Config(configContainer);
