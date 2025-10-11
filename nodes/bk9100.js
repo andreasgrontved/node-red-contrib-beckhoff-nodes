@@ -4,9 +4,12 @@ module.exports = function (RED) {
 
     // Card address sizes and function codes
     const CARD_INFO = {
-        'KL1808': { size: 8, fc: 'readCoils' },           // FC2 - Read Input Status (digital)
-        'KL3208': { size: 16, fc: 'readInputRegisters' }, // FC4 - Read Input Registers (analog)
-        'KL3468': { size: 16, fc: 'readInputRegisters' }  // FC4 - Read Input Registers (analog)
+        'KL1804': { size: 4, fc: 'readCoils', channels: 4 },           // FC2 - 4 digital inputs
+        'KL1808': { size: 8, fc: 'readCoils', channels: 8 },           // FC2 - 8 digital inputs
+        'KL3204': { size: 8, fc: 'readInputRegisters', channels: 4 },  // FC4 - 4 analog (4×2 for state+data)
+        'KL3208': { size: 16, fc: 'readInputRegisters', channels: 8 }, // FC4 - 8 analog (8×2 for state+data)
+        'KL3464': { size: 8, fc: 'readInputRegisters', channels: 4 },  // FC4 - 4 analog (4×2 for state+data)
+        'KL3468': { size: 16, fc: 'readInputRegisters', channels: 8 }  // FC4 - 8 analog (8×2 for state+data)
     };
 
     // State meanings for KL3208

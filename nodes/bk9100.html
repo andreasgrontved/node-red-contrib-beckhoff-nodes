@@ -18,10 +18,13 @@ RED.nodes.registerType('BK9100', {
     inputs: 0,
     outputs: 1,
 
-    label: function () { return this.name || "BK9100"; },
+    label: function () { 
+        return this.name || "BK9100"; 
+    },
+    
     outputLabels: function (i) {
         const c = (this.cards || [])[i];
-        return c ? (c.label || c.type || `Out ${i+1}`) : `Out ${i+1}`;
+        return c ? (c.label || c.type || "Out " + (i+1)) : "Out " + (i+1);
     },
 
     oneditprepare: function () {
@@ -42,7 +45,6 @@ RED.nodes.registerType('BK9100', {
             setOutputs(n || 1);
         }
 
-        // Sensor type options for KL3208
         const sensorOptions = [
             { value: 'pt1000', label: 'Pt1000 (default)' },
             { value: 'ni1000', label: 'Ni1000' },
@@ -58,14 +60,12 @@ RED.nodes.registerType('BK9100', {
             { value: 'ntc_100k', label: 'NTC 100kΩ' }
         ];
 
-        // Signal range options for KL3468
         const rangeOptions = [
             { value: '0-10', label: '0-10V' },
             { value: '0.5-10', label: '0.5-10V' },
             { value: '2-10', label: '2-10V' }
         ];
 
-        // Manufacturer options for KL3468
         const manufacturerOptions = [
             { value: 'generic', label: 'Generic' },
             { value: 'belimo', label: 'Belimo' }
@@ -73,8 +73,8 @@ RED.nodes.registerType('BK9100', {
 
         function createSensorSelect(value) {
             const select = $('<select class="node-input-sensor-type" style="width:100%"></select>');
-            sensorOptions.forEach(opt => {
-                select.append(`<option value="${opt.value}">${opt.label}</option>`);
+            sensorOptions.forEach(function(opt) {
+                select.append('<option value="' + opt.value + '">' + opt.label + '</option>');
             });
             if (value) select.val(value);
             return select;
@@ -82,8 +82,8 @@ RED.nodes.registerType('BK9100', {
 
         function createRangeSelect(value) {
             const select = $('<select class="node-input-range-type" style="width:100%"></select>');
-            rangeOptions.forEach(opt => {
-                select.append(`<option value="${opt.value}">${opt.label}</option>`);
+            rangeOptions.forEach(function(opt) {
+                select.append('<option value="' + opt.value + '">' + opt.label + '</option>');
             });
             if (value) select.val(value);
             return select;
@@ -91,8 +91,8 @@ RED.nodes.registerType('BK9100', {
 
         function createManufacturerSelect(value) {
             const select = $('<select class="node-input-manufacturer-type" style="width:100%"></select>');
-            manufacturerOptions.forEach(opt => {
-                select.append(`<option value="${opt.value}">${opt.label}</option>`);
+            manufacturerOptions.forEach(function(opt) {
+                select.append('<option value="' + opt.value + '">' + opt.label + '</option>');
             });
             if (value) select.val(value);
             return select;
@@ -103,22 +103,25 @@ RED.nodes.registerType('BK9100', {
             
             const header = $('<div style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;"></div>');
             const icon = $('<i class="fa fa-caret-right" style="transition:transform 0.2s;"></i>');
-            const title = $('<span style="font-weight:600;">KL3208 Channel Configuration</span>');
+            const title = $('<span style="font-weight:600;">Channel Configuration</span>');
             header.append(icon, title);
             configDiv.append(header);
             
             const grid = $('<div class="channel-grid" style="display:none;grid-template-columns:80px 1fr;gap:6px;align-items:center;margin-top:6px;"></div>');
             
-            for (let ch = 1; ch <= 8; ch++) {
-                grid.append(`<label style="text-align:right;">Ch ${ch}:</label>`);
-                const select = createSensorSelect(config?.channels?.[ch-1] || 'pt1000');
+            const numChannels = config && config.numChannels ? config.numChannels : 8;
+            
+            for (let ch = 1; ch <= numChannels; ch++) {
+                grid.append('<label style="text-align:right;">Ch ' + ch + ':</label>');
+                const channelConfig = config && config.channels ? config.channels[ch-1] : 'pt1000';
+                const select = createSensorSelect(channelConfig);
                 select.attr('data-channel', ch-1);
                 grid.append(select);
             }
             
+            grid.attr('data-num-channels', numChannels);
             configDiv.append(grid);
             
-            // Toggle collapse/expand
             header.on('click', function() {
                 const isVisible = grid.is(':visible');
                 grid.toggle(!isVisible);
@@ -137,26 +140,30 @@ RED.nodes.registerType('BK9100', {
             
             const header = $('<div style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;"></div>');
             const icon = $('<i class="fa fa-caret-right" style="transition:transform 0.2s;"></i>');
-            const title = $('<span style="font-weight:600;">KL3468 Channel Configuration</span>');
+            const title = $('<span style="font-weight:600;">Channel Configuration</span>');
             header.append(icon, title);
             configDiv.append(header);
             
             const grid = $('<div class="channel-grid" style="display:none;grid-template-columns:60px 140px 140px;gap:6px;align-items:center;margin-top:6px;"></div>');
             
-            for (let ch = 1; ch <= 8; ch++) {
-                grid.append(`<label style="text-align:right;">Ch ${ch}:</label>`);
-                const rangeSelect = createRangeSelect(config?.channels?.[ch-1]?.range || '0-10');
+            const numChannels = config && config.numChannels ? config.numChannels : 8;
+            
+            for (let ch = 1; ch <= numChannels; ch++) {
+                grid.append('<label style="text-align:right;">Ch ' + ch + ':</label>');
+                
+                const channelConfig = config && config.channels && config.channels[ch-1] ? config.channels[ch-1] : {};
+                const rangeSelect = createRangeSelect(channelConfig.range || '0-10');
                 rangeSelect.attr('data-channel', ch-1);
                 grid.append(rangeSelect);
                 
-                const mfgSelect = createManufacturerSelect(config?.channels?.[ch-1]?.manufacturer || 'generic');
+                const mfgSelect = createManufacturerSelect(channelConfig.manufacturer || 'generic');
                 mfgSelect.attr('data-channel', ch-1);
                 grid.append(mfgSelect);
             }
             
+            grid.attr('data-num-channels', numChannels);
             configDiv.append(grid);
             
-            // Toggle collapse/expand
             header.on('click', function() {
                 const isVisible = grid.is(':visible');
                 grid.toggle(!isVisible);
@@ -170,7 +177,6 @@ RED.nodes.registerType('BK9100', {
             container.find('.kl3468-config').remove();
         }
 
-        // header
         $("#bk-cards-header").empty().append(
             '<div style="display:flex;gap:6px;padding:0 6px 4px 6px;align-items:center;">' +
             '  <div style="width:160px;font-weight:600;">Type</div>' +
@@ -181,66 +187,65 @@ RED.nodes.registerType('BK9100', {
 
         $("#bk-cards").editableList({
             addItem: function (container, index, data) {
-                const row = $('<div class="red-ui-editableList-item-content" ' +
-                              'style="padding:6px;"></div>').appendTo(container);
-
+                const row = $('<div class="red-ui-editableList-item-content" style="padding:6px;"></div>').appendTo(container);
                 const mainRow = $('<div style="display:flex;gap:6px;align-items:center;"></div>').appendTo(row);
 
-                // TYPE
                 const typeWrap = $('<div style="width:160px"></div>').appendTo(mainRow);
-                const typeInput = $('<input type="text" class="node-input-card-type" style="width:100%" ' +
-                  'placeholder="KL1808 / KL3208 / KL3468">').appendTo(typeWrap);
+                const typeInput = $('<input type="text" class="node-input-card-type" style="width:100%" placeholder="KL1804/08, KL3204/08, KL3464/68">').appendTo(typeWrap);
 
-                // LABEL
                 const labelWrap = $('<div style="width:220px"></div>').appendTo(mainRow);
-                $('<input type="text" class="node-input-card-label" style="width:100%" ' +
-                  'placeholder="e.g. Inputs A">').appendTo(labelWrap);
+                $('<input type="text" class="node-input-card-label" style="width:100%" placeholder="e.g. Inputs A">').appendTo(labelWrap);
 
-                // FILTER
                 const filterWrap = $('<div style="flex:1"></div>').appendTo(mainRow);
-                $('<input type="text" class="node-input-card-filter" style="width:100%" ' +
-                  'placeholder="Optional - leave empty to auto-match">').appendTo(filterWrap);
+                $('<input type="text" class="node-input-card-filter" style="width:100%" placeholder="Optional - leave empty to auto-match">').appendTo(filterWrap);
 
-                // Config container (for KL3208/KL3468 specific settings)
                 const configContainer = $('<div class="card-config-container"></div>').appendTo(row);
 
-                // Show/hide card-specific config based on type
                 typeInput.on('change keyup', function() {
                     const type = $(this).val().trim().toUpperCase();
                     
-                    // Handle KL3208
-                    if (type === 'KL3208') {
+                    if (type === 'KL3204' || type === 'KL3208') {
                         hideKL3468Config(configContainer);
                         if (!configContainer.find('.kl3208-config').length) {
-                            showKL3208Config(configContainer, data?.config);
+                            const numChannels = type === 'KL3204' ? 4 : 8;
+                            const cfg = data && data.config ? data.config : {};
+                            cfg.numChannels = numChannels;
+                            showKL3208Config(configContainer, cfg);
                         }
                     } else {
                         hideKL3208Config(configContainer);
                     }
                     
-                    // Handle KL3468
-                    if (type === 'KL3468') {
+                    if (type === 'KL3464' || type === 'KL3468') {
                         hideKL3208Config(configContainer);
                         if (!configContainer.find('.kl3468-config').length) {
-                            showKL3468Config(configContainer, data?.config);
+                            const numChannels = type === 'KL3464' ? 4 : 8;
+                            const cfg = data && data.config ? data.config : {};
+                            cfg.numChannels = numChannels;
+                            showKL3468Config(configContainer, cfg);
                         }
                     } else {
                         hideKL3468Config(configContainer);
                     }
                 });
 
-                // populate
                 if (data && typeof data === "object") {
                     typeInput.val(data.type || "");
                     row.find(".node-input-card-label").val(data.label || "");
                     row.find(".node-input-card-filter").val(data.filter || "");
                     
-                    // Trigger type check to show config if needed
-                    if (data.type && data.type.toUpperCase() === 'KL3208') {
-                        showKL3208Config(configContainer, data.config);
+                    const cardType = data.type ? data.type.toUpperCase() : "";
+                    if (cardType === 'KL3204' || cardType === 'KL3208') {
+                        const numChannels = cardType === 'KL3204' ? 4 : 8;
+                        const cfg = data.config || {};
+                        cfg.numChannels = numChannels;
+                        showKL3208Config(configContainer, cfg);
                     }
-                    if (data.type && data.type.toUpperCase() === 'KL3468') {
-                        showKL3468Config(configContainer, data.config);
+                    if (cardType === 'KL3464' || cardType === 'KL3468') {
+                        const numChannels = cardType === 'KL3464' ? 4 : 8;
+                        const cfg = data.config || {};
+                        cfg.numChannels = numChannels;
+                        showKL3468Config(configContainer, cfg);
                     }
                 }
 
@@ -254,13 +259,14 @@ RED.nodes.registerType('BK9100', {
             removeItem: recompute
         });
 
-        // load saved cards
         let cards = this.cards;
         if (typeof cards === "string") {
-            try { cards = JSON.parse(cards); } catch { cards = []; }
+            try { cards = JSON.parse(cards); } catch(e) { cards = []; }
         }
         if (Array.isArray(cards) && cards.length) {
-            cards.forEach(c => $("#bk-cards").editableList('addItem', c));
+            cards.forEach(function(c) { 
+                $("#bk-cards").editableList('addItem', c); 
+            });
         } else {
             $("#bk-cards").editableList('addItem', { type:"KL1808", label:"", filter:"" });
         }
@@ -278,34 +284,32 @@ RED.nodes.registerType('BK9100', {
                 filter: row.find(".node-input-card-filter").val() || ""
             };
             
-            // Save KL3208 channel configuration
-            if (type.toUpperCase() === 'KL3208') {
+            if (type.toUpperCase() === 'KL3204' || type.toUpperCase() === 'KL3208') {
                 const channels = [];
                 row.find('.node-input-sensor-type').each(function() {
                     channels.push($(this).val());
                 });
-                if (channels.length === 8) {
-                    card.config = { channels };
+                if (channels.length > 0) {
+                    card.config = { channels: channels };
                 }
             }
             
-            // Save KL3468 channel configuration
-            if (type.toUpperCase() === 'KL3468') {
+            if (type.toUpperCase() === 'KL3464' || type.toUpperCase() === 'KL3468') {
                 const channels = [];
                 row.find('.node-input-range-type').each(function() {
                     const ch = $(this).attr('data-channel');
                     const range = $(this).val();
-                    const manufacturer = row.find(`.node-input-manufacturer-type[data-channel="${ch}"]`).val();
-                    channels.push({ range, manufacturer });
+                    const manufacturer = row.find('.node-input-manufacturer-type[data-channel="' + ch + '"]').val();
+                    channels.push({ range: range, manufacturer: manufacturer });
                 });
-                if (channels.length === 8) {
-                    card.config = { channels };
+                if (channels.length > 0) {
+                    card.config = { channels: channels };
                 }
             }
             
             cards.push(card);
         });
-        this.cards   = cards;
+        this.cards = cards;
         const n = Math.max(1, cards.length);
         this.outputs = n;
         $("#node-input-outputs").val(n);
@@ -348,9 +352,10 @@ RED.nodes.registerType('BK9100', {
 
     <div class="form-tips" style="margin-top:8px;margin-bottom:12px;">
         <b>Auto-addressing:</b> Cards are polled in order. Addresses auto-calculate based on card position 
-        (KL1808=8 addr, KL3208/KL3468=16 addr). Reorder cards to match physical BK9100 configuration.
-        <br><b>KL3208:</b> Configure sensor types for each of the 8 channels.
-        <br><b>KL3468:</b> Configure voltage range and manufacturer for each of the 8 channels.
+        (KL1804=4, KL1808=8, KL3204/KL3464=8, KL3208/KL3468=16 addresses). 
+        Reorder cards to match physical BK9100 configuration.
+        <br><b>Temperature cards (KL3204/KL3208):</b> Configure sensor types for each channel.
+        <br><b>Voltage cards (KL3464/KL3468):</b> Configure voltage range and manufacturer for each channel.
     </div>
 
     <div id="bk-cards-header"></div>
@@ -359,10 +364,10 @@ RED.nodes.registerType('BK9100', {
 
 <script type="text/x-red" data-help-name="BK9100">
     <p>Polls Beckhoff BK9100 bus coupler via Modbus TCP and routes data to outputs based on card configuration.</p>
-    <p><b>KL1808:</b> 8 digital inputs, outputs boolean values per channel.</p>
-    <p><b>KL3208:</b> 8 analog temperature inputs. Configure the sensor type for each channel. 
+    <p><b>KL1804/KL1808:</b> Digital inputs (4 or 8 channels), outputs boolean values per channel.</p>
+    <p><b>KL3204/KL3208:</b> Analog temperature inputs (4 or 8 channels). Configure the sensor type for each channel. 
        The node converts raw Modbus data to temperature readings in both Celsius and Fahrenheit.</p>
-    <p><b>KL3468:</b> 8 analog voltage inputs (0-10V). Configure the voltage range and manufacturer 
+    <p><b>KL3464/KL3468:</b> Analog voltage inputs 0-10V (4 or 8 channels). Configure the voltage range and manufacturer 
        for each channel. The node converts to voltage and percentage (0-100%). Supports Belimo 
        adaptation mode detection.</p>
 </script>
