@@ -1,43 +1,46 @@
 <script type="text/javascript">
 RED.nodes.registerType('BK9100', {
-    category: 'function',
+    category: 'Beckhoff',             // <-- its own palette section
     color: '#C7E9FF',
+    paletteLabel: 'BK9100 Router',
     defaults: {
-        name: { value: "" },
-        cards: { value: [] }   // [{type,label,filter}]
+        name:  { value: "" },
+        cards: { value: [] }          // [{type,label,filter}]
     },
     inputs: 1,
-    outputs: 1,               // will be overridden via hidden field
+    // Editor-live & runtime-safe dynamic outputs:
+    outputs: function () {
+        return Math.max(1, (this.cards && this.cards.length) ? this.cards.length : 1);
+    },
+    outputLabels: function (index) {
+        const c = (this.cards || [])[index];
+        return c ? (c.label || c.type || `Out ${index+1}`) : `Out ${index+1}`;
+    },
     icon: "bridge.svg",
     label: function () { return this.name || "BK9100"; },
 
     oneditprepare: function () {
         const node = this;
 
-        // Hidden "outputs" control so NR saves the dynamic output count
-        if ($("#node-input-outputs").length === 0) {
-            $("<input/>", { type: "hidden", id: "node-input-outputs" })
-              .appendTo("#dialog-form");
-        }
+        // Hidden field so the UI updates port count instantly (like switch node)
+        // (Putting it directly in the template below ensures NR picks it up.)
+        function setOutputs(n){ $("#node-input-outputs").val(Math.max(1,n)).trigger("change"); }
 
         function recomputeOutputs() {
             const n = $("#bk-cards").editableList('items').length;
-            $("#node-input-outputs").val(Math.max(1, n));
+            setOutputs(n);
         }
 
-        // Cards list UI
         $("#bk-cards").editableList({
             addItem: function (container, index, data) {
                 const row = $('<div class="form-row" style="display:flex;gap:8px;align-items:center;"></div>').appendTo(container);
 
-                // Type dropdown (add/adjust as you like; can also be free-text)
-                const typeSel = $('<select/>', { class: "node-input-card-type", style:"width:180px" })
-                  .append('<option value="KL1808">KL1808</option>')
-                  .append('<option value="KL3208">KL3208</option>')
-                  .append('<option value="KL3468">KL3468</option>')
-                  .appendTo(row);
+                const typeSel = $('<select/>', { class:"node-input-card-type", style:"width:180px" })
+                    .append('<option value="KL1808">KL1808</option>')
+                    .append('<option value="KL3208">KL3208</option>')
+                    .append('<option value="KL3468">KL3468</option>')
+                    .appendTo(row);
 
-                // Label
                 $('<input/>', {
                     class: "node-input-card-label",
                     type: "text",
@@ -45,7 +48,6 @@ RED.nodes.registerType('BK9100', {
                     style: "flex:1"
                 }).appendTo(row);
 
-                // Topic filter
                 $('<input/>', {
                     class: "node-input-card-filter",
                     type: "text",
@@ -53,13 +55,11 @@ RED.nodes.registerType('BK9100', {
                     style: "width:260px"
                 }).appendTo(row);
 
-                // populate
                 if (data) {
                     typeSel.val(data.type || "KL1808");
                     row.find(".node-input-card-label").val(data.label || "");
                     row.find(".node-input-card-filter").val(data.filter || "");
                 }
-
                 recomputeOutputs();
             },
             removable: true,
@@ -71,13 +71,11 @@ RED.nodes.registerType('BK9100', {
             addItemBefore: recomputeOutputs
         });
 
-        // load saved cards
         (node.cards || []).forEach(c => $("#bk-cards").editableList('addItem', c));
         recomputeOutputs();
     },
 
     oneditsave: function () {
-        // gather ordered card data
         const items = $("#bk-cards").editableList('items');
         const cards = [];
         items.each(function () {
@@ -95,15 +93,18 @@ RED.nodes.registerType('BK9100', {
 </script>
 
 <script type="text/x-red" data-template-name="BK9100">
+    <!-- Hidden outputs field so the editor adds/removes ports live -->
+    <input type="hidden" id="node-input-outputs">
+
     <div class="form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
         <input type="text" id="node-input-name" placeholder="BK9100"/>
     </div>
 
     <div class="form-tips" style="margin-top:8px">
-        <b>Routing:</b> Incoming <code>msg.topic</code> is matched to each card.
-        If a card has a <i>Topic filter</i>, that is used (supports exact, <code>*wildcard*</code>, or <code>/regex/</code>).
-        Otherwise it matches the card <i>Type</i> (e.g., <code>KL1808</code>).
+        <b>Routing:</b> <code>msg.topic</code> is matched to each card. A card’s
+        <i>Topic filter</i> supports exact (<code>KL1808</code>), wildcard
+        (<code>KL*</code>), or regex (<code>/^KL3\d{3}$/</code>). If empty, it matches the card <b>Type</b>.
         Reorder cards to change output order; outputs follow automatically.
     </div>
 
@@ -114,10 +115,6 @@ RED.nodes.registerType('BK9100', {
 </script>
 
 <script type="text/x-red" data-help-name="BK9100">
-    <p>Routes <code>msg</code> to one of N outputs based on <code>msg.topic</code>.</p>
-    <ul>
-        <li><b>Topic filter</b>: exact (e.g. <code>KL1808</code>), wildcard (e.g. <code>KL*</code>), or regex (e.g. <code>/^KL3\d{3}$/</code>).</li>
-        <li>If no filter is provided, the card matches when <code>msg.topic</code> equals the card <b>Type</b>.</li>
-        <li>The number and order of outputs equals the number and order of cards.</li>
-    </ul>
+    <p>Routes messages to one of N outputs based on <code>msg.topic</code>.
+       Number and order of outputs follow the configured cards.</p>
 </script>

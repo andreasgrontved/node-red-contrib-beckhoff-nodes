@@ -2,26 +2,19 @@ module.exports = function (RED) {
 
     function makeMatcher(filter, fallbackExact) {
         if (filter && typeof filter === "string" && filter.length) {
-            // regex: /.../
             if (filter.startsWith("/") && filter.endsWith("/")) {
                 try {
                     const re = new RegExp(filter.slice(1, -1));
                     return t => typeof t === "string" && re.test(t);
-                } catch (e) {
-                    return () => false; // invalid regex => never match
-                }
+                } catch { return () => false; }
             }
-            // wildcard: *
             if (filter.includes("*")) {
                 const esc = s => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
-                const reStr = "^" + esc(filter).replace(/\*/g, ".*") + "$";
-                const re = new RegExp(reStr);
+                const re = new RegExp("^" + esc(filter).replace(/\*/g, ".*") + "$");
                 return t => typeof t === "string" && re.test(t);
             }
-            // exact
             return t => t === filter;
         }
-        // fallback exact to card.type
         return t => t === fallbackExact;
     }
 
@@ -46,11 +39,7 @@ module.exports = function (RED) {
                 let hits = 0;
 
                 routes.forEach((r, i) => {
-                    if (r.match(topic)) {
-                        // If you prefer to clone per output: RED.util.cloneMessage(msg)
-                        outs[i] = msg;
-                        hits++;
-                    }
+                    if (r.match(topic)) { outs[i] = msg; hits++; }
                 });
 
                 if (typeof topic === "string") {
@@ -67,7 +56,7 @@ module.exports = function (RED) {
                 done && done();
             } catch (err) {
                 node.status({ fill: "red", shape: "ring", text: "error" });
-                if (done) done(err); else node.error(err, msg);
+                done ? done(err) : node.error(err, msg);
             }
         });
     }
