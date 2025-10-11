@@ -20,13 +20,14 @@ module.exports = function (RED) {
     };
 
     function convertKL1808Data(rawArray) {
-        if (!Array.isArray(rawArray) || rawArray.length !== 8) {
-            return { error: "Expected 8-element array from Modbus" };
+        const expectedSize = rawArray.length;
+        if (!Array.isArray(rawArray) || (expectedSize !== 4 && expectedSize !== 8)) {
+            return { error: `Expected 4 or 8 element array from Modbus, got ${rawArray?.length}` };
         }
 
         const channels = [];
         
-        for (let ch = 0; ch < 8; ch++) {
+        for (let ch = 0; ch < expectedSize; ch++) {
             const rawValue = rawArray[ch];
             channels.push({
                 channel: ch + 1,
@@ -39,13 +40,16 @@ module.exports = function (RED) {
     }
 
     function convertKL3208Data(rawArray, channelConfigs) {
-        if (!Array.isArray(rawArray) || rawArray.length !== 16) {
-            return { error: "Expected 16-element array from Modbus" };
+        const expectedSize = rawArray.length;
+        const numChannels = expectedSize / 2; // 8 addresses = 4 channels, 16 addresses = 8 channels
+        
+        if (!Array.isArray(rawArray) || (expectedSize !== 8 && expectedSize !== 16)) {
+            return { error: `Expected 8 or 16 element array from Modbus, got ${rawArray?.length}` };
         }
 
         const channels = [];
         
-        for (let ch = 0; ch < 8; ch++) {
+        for (let ch = 0; ch < numChannels; ch++) {
             const stateIdx = ch * 2;
             const dataIdx = ch * 2 + 1;
             
@@ -103,13 +107,16 @@ module.exports = function (RED) {
     }
 
     function convertKL3468Data(rawArray, channelConfigs) {
-        if (!Array.isArray(rawArray) || rawArray.length !== 16) {
-            return { error: "Expected 16-element array from Modbus" };
+        const expectedSize = rawArray.length;
+        const numChannels = expectedSize / 2; // 8 addresses = 4 channels, 16 addresses = 8 channels
+        
+        if (!Array.isArray(rawArray) || (expectedSize !== 8 && expectedSize !== 16)) {
+            return { error: `Expected 8 or 16 element array from Modbus, got ${rawArray?.length}` };
         }
 
         const channels = [];
         
-        for (let ch = 0; ch < 8; ch++) {
+        for (let ch = 0; ch < numChannels; ch++) {
             const stateIdx = ch * 2;
             const dataIdx = ch * 2 + 1;
             
@@ -338,13 +345,26 @@ module.exports = function (RED) {
                     
                     // Process based on card type
                     let payload;
-                    if (route.type === 'KL1808') {
+                    const cardType = route.type;
+                    
+                    if (cardType === 'KL1804' || cardType === 'KL1808') {
                         payload = convertKL1808Data(data);
-                    } else if (route.type === 'KL3208') {
+                        if (payload.error) {
+                            node.warn(`${cardType} conversion error: ${payload.error}`);
+                        }
+                    } else if (cardType === 'KL3204' || cardType === 'KL3208') {
                         payload = convertKL3208Data(data, route.config?.channels);
-                    } else if (route.type === 'KL3468') {
+                        if (payload.error) {
+                            node.warn(`${cardType} conversion error: ${payload.error}`);
+                        }
+                    } else if (cardType === 'KL3464' || cardType === 'KL3468') {
                         payload = convertKL3468Data(data, route.config?.channels);
+                        if (payload.error) {
+                            node.warn(`${cardType} conversion error: ${payload.error}`);
+                        }
                     } else {
+                        // Unknown card type - output raw data with warning
+                        node.warn(`Unknown card type: ${cardType} - outputting raw data`);
                         payload = data;
                     }
                     
