@@ -65,9 +65,14 @@ RED.nodes.registerType('BK9100', {
 
         function showKL3208Config(container, config) {
             const configDiv = $('<div class="kl3208-config" style="margin-top:8px;padding:8px;border:1px solid #ddd;border-radius:4px;background:#f9f9f9;"></div>');
-            configDiv.append('<div style="font-weight:600;margin-bottom:6px;">KL3208 Channel Configuration:</div>');
             
-            const grid = $('<div style="display:grid;grid-template-columns:80px 1fr;gap:6px;align-items:center;"></div>');
+            const header = $('<div style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;"></div>');
+            const icon = $('<i class="fa fa-caret-right" style="transition:transform 0.2s;"></i>');
+            const title = $('<span style="font-weight:600;">KL3208 Channel Configuration</span>');
+            header.append(icon, title);
+            configDiv.append(header);
+            
+            const grid = $('<div class="channel-grid" style="display:none;grid-template-columns:80px 1fr;gap:6px;align-items:center;margin-top:6px;"></div>');
             
             for (let ch = 1; ch <= 8; ch++) {
                 grid.append(`<label style="text-align:right;">Ch ${ch}:</label>`);
@@ -77,6 +82,14 @@ RED.nodes.registerType('BK9100', {
             }
             
             configDiv.append(grid);
+            
+            // Toggle collapse/expand
+            header.on('click', function() {
+                const isVisible = grid.is(':visible');
+                grid.toggle(!isVisible);
+                icon.css('transform', isVisible ? 'rotate(0deg)' : 'rotate(90deg)');
+            });
+            
             container.append(configDiv);
         }
 
