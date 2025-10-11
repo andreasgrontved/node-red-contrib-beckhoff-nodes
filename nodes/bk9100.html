@@ -124,8 +124,42 @@ RED.nodes.registerType('BK9100', {
             container.append(configDiv);
         }
 
-        function hideKL3208Config(container) {
-            container.find('.kl3208-config').remove();
+        function showKL3468Config(container, config) {
+            const configDiv = $('<div class="kl3468-config" style="margin-top:8px;padding:8px;border:1px solid #ddd;border-radius:4px;background:#f9f9f9;"></div>');
+            
+            const header = $('<div style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;"></div>');
+            const icon = $('<i class="fa fa-caret-right" style="transition:transform 0.2s;"></i>');
+            const title = $('<span style="font-weight:600;">KL3468 Channel Configuration</span>');
+            header.append(icon, title);
+            configDiv.append(header);
+            
+            const grid = $('<div class="channel-grid" style="display:none;grid-template-columns:60px 140px 140px;gap:6px;align-items:center;margin-top:6px;"></div>');
+            
+            for (let ch = 1; ch <= 8; ch++) {
+                grid.append(`<label style="text-align:right;">Ch ${ch}:</label>`);
+                const rangeSelect = createRangeSelect(config?.channels?.[ch-1]?.range || '0-10');
+                rangeSelect.attr('data-channel', ch-1);
+                grid.append(rangeSelect);
+                
+                const mfgSelect = createManufacturerSelect(config?.channels?.[ch-1]?.manufacturer || 'generic');
+                mfgSelect.attr('data-channel', ch-1);
+                grid.append(mfgSelect);
+            }
+            
+            configDiv.append(grid);
+            
+            // Toggle collapse/expand
+            header.on('click', function() {
+                const isVisible = grid.is(':visible');
+                grid.toggle(!isVisible);
+                icon.css('transform', isVisible ? 'rotate(0deg)' : 'rotate(90deg)');
+            });
+            
+            container.append(configDiv);
+        }
+
+        function hideKL3468Config(container) {
+            container.find('.kl3468-config').remove();
         }
 
         $("#bk-cards-header").empty().append(
@@ -171,6 +205,14 @@ RED.nodes.registerType('BK9100', {
                     } else {
                         hideKL3208Config(configContainer);
                     }
+                    
+                    if (type === 'KL3468') {
+                        if (!configContainer.find('.kl3468-config').length) {
+                            showKL3468Config(configContainer, data?.config);
+                        }
+                    } else {
+                        hideKL3468Config(configContainer);
+                    }
                 });
 
                 // populate
@@ -182,6 +224,9 @@ RED.nodes.registerType('BK9100', {
                     // Trigger type check to show config if needed
                     if (data.type && data.type.toUpperCase() === 'KL3208') {
                         showKL3208Config(configContainer, data.config);
+                    }
+                    if (data.type && data.type.toUpperCase() === 'KL3468') {
+                        showKL3468Config(configContainer, data.config);
                     }
                 }
 
@@ -230,6 +275,20 @@ RED.nodes.registerType('BK9100', {
                 }
             }
             
+            // Save KL3468 channel configuration
+            if (type.toUpperCase() === 'KL3468') {
+                const channels = [];
+                row.find('.node-input-range-type').each(function() {
+                    const ch = $(this).attr('data-channel');
+                    const range = $(this).val();
+                    const manufacturer = row.find(`.node-input-manufacturer-type[data-channel="${ch}"]`).val();
+                    channels.push({ range, manufacturer });
+                });
+                if (channels.length === 8) {
+                    card.config = { channels };
+                }
+            }
+            
             cards.push(card);
         });
         this.cards   = cards;
@@ -254,6 +313,7 @@ RED.nodes.registerType('BK9100', {
         or regex (<code>/^KL3\\d{3}$/</code>). If empty, it matches the card <b>Type</b>.
         Reorder cards to change output order; the number of outputs follows the list.
         <br><b>KL3208:</b> Configure sensor types for each of the 8 channels.
+        <br><b>KL3468:</b> Configure voltage range and manufacturer for each of the 8 channels.
     </div>
 
     <div id="bk-cards-header"></div>
@@ -263,6 +323,10 @@ RED.nodes.registerType('BK9100', {
 <script type="text/x-red" data-help-name="BK9100">
     <p>Routes messages to one of N outputs based on <code>msg.topic</code>.
        Outputs = number of configured cards; order matches the list.</p>
-    <p>For <b>KL3208</b> cards, configure the sensor type for each channel. The node will
-       convert raw Modbus data to temperature readings in both Celsius and Fahrenheit.</p>
+    <p><b>KL1808:</b> 8 digital inputs, outputs boolean values per channel.</p>
+    <p><b>KL3208:</b> 8 analog temperature inputs. Configure the sensor type for each channel. 
+       The node converts raw Modbus data to temperature readings in both Celsius and Fahrenheit.</p>
+    <p><b>KL3468:</b> 8 analog voltage inputs (0-10V). Configure the voltage range and manufacturer 
+       for each channel. The node converts to voltage and percentage (0-100%). Supports Belimo 
+       adaptation mode detection.</p>
 </script>
