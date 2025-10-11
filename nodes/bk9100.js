@@ -34,23 +34,19 @@ module.exports = function (RED) {
 
         node.on('input', function (msg, send, done) {
             try {
-                const topic = msg.topic;
                 const outs = new Array(routes.length).fill(null);
+                const topic = msg.topic;
                 let hits = 0;
 
                 routes.forEach((r, i) => {
                     if (r.match(topic)) { outs[i] = msg; hits++; }
                 });
 
-                if (typeof topic === "string") {
-                    node.status({
-                        fill: hits ? "green" : "yellow",
-                        shape: hits ? "dot" : "ring",
-                        text: `${topic} → ${hits}/${routes.length}`
-                    });
-                } else {
-                    node.status({ fill: "blue", shape: "dot", text: `${hits} match(es)` });
-                }
+                node.status({
+                    fill: hits ? "green" : "yellow",
+                    shape: hits ? "dot" : "ring",
+                    text: `${topic ?? '(no topic)'} → ${hits}/${routes.length}`
+                });
 
                 send(outs);
                 done && done();
