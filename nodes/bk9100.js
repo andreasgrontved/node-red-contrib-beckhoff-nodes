@@ -65,21 +65,24 @@ module.exports = function (RED) {
                 percentage = ((voltage - minV) / (maxV - minV)) * 100;
             }
             
-            // Detect Belimo adaptation mode
-            const adaptationMode = (manufacturer === 'belimo' && 
-                                   range === '0.5-10' && 
-                                   Math.abs(rawValue - adaptationRaw) < 10);
-            
-            channels.push({
+            // Build channel data
+            const channelData = {
                 channel: ch + 1,
                 state,
                 rawValue,
                 voltage: Math.round(voltage * 100) / 100,
                 percentage: Math.round(percentage * 10) / 10,
                 range,
-                manufacturer,
-                adaptationMode
-            });
+                manufacturer
+            };
+            
+            // Only include adaptationMode for Belimo with 0.5-10V range
+            if (manufacturer === 'belimo' && range === '0.5-10') {
+                const adaptationMode = Math.abs(rawValue - adaptationRaw) < 10;
+                channelData.adaptationMode = adaptationMode;
+            }
+            
+            channels.push(channelData);
         }
         
         return { channels };
