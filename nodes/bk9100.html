@@ -241,14 +241,11 @@ RED.nodes.registerType('BK9100', {
                 const row = $('<div class="red-ui-editableList-item-content" style="padding:6px;"></div>').appendTo(container);
                 const mainRow = $('<div style="display:flex;gap:6px;align-items:center;"></div>').appendTo(row);
 
-                const typeWrap = $('<div style="width:140px"></div>').appendTo(mainRow);
+                const typeWrap = $('<div style="width:160px"></div>').appendTo(mainRow);
                 const typeInput = $('<input type="text" class="node-input-card-type" style="width:100%" placeholder="KL1804/08, KL3204/08, KL3464/68">').appendTo(typeWrap);
 
-                const labelWrap = $('<div style="width:180px"></div>').appendTo(mainRow);
+                const labelWrap = $('<div style="width:220px"></div>').appendTo(mainRow);
                 $('<input type="text" class="node-input-card-label" style="width:100%" placeholder="e.g. Inputs A">').appendTo(labelWrap);
-
-                const pollWrap = $('<div style="width:100px"></div>').appendTo(mainRow);
-                $('<input type="number" class="node-input-card-poll" style="width:100%" placeholder="1000" min="100" step="100">').appendTo(pollWrap);
 
                 const filterWrap = $('<div style="flex:1"></div>').appendTo(mainRow);
                 $('<input type="text" class="node-input-card-filter" style="width:100%" placeholder="Optional - leave empty to auto-match">').appendTo(filterWrap);
@@ -305,23 +302,23 @@ RED.nodes.registerType('BK9100', {
                     row.find(".node-input-card-filter").val(data.filter || "");
                     
                     const cardType = data.type ? data.type.toUpperCase() : "";
+                    const pollRateValue = data.pollRate || null;
+                    
                     if (cardType === 'KL1804' || cardType === 'KL1808') {
-                        const cfg = data.config || {};
-                        cfg.pollRate = data.pollRate;
-                        showKL1808Config(configContainer, cfg);
+                        showKL1808Config(configContainer, { pollRate: pollRateValue });
                     }
-                    if (cardType === 'KL3204' || cardType === 'KL3208') {
+                    else if (cardType === 'KL3204' || cardType === 'KL3208') {
                         const numChannels = cardType === 'KL3204' ? 4 : 8;
                         const cfg = data.config || {};
                         cfg.numChannels = numChannels;
-                        cfg.pollRate = data.pollRate;
+                        cfg.pollRate = pollRateValue;
                         showKL3208Config(configContainer, cfg);
                     }
-                    if (cardType === 'KL3464' || cardType === 'KL3468') {
+                    else if (cardType === 'KL3464' || cardType === 'KL3468') {
                         const numChannels = cardType === 'KL3464' ? 4 : 8;
                         const cfg = data.config || {};
                         cfg.numChannels = numChannels;
-                        cfg.pollRate = data.pollRate;
+                        cfg.pollRate = pollRateValue;
                         showKL3468Config(configContainer, cfg);
                     }
                 }
