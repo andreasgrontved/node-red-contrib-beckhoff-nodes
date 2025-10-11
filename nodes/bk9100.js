@@ -2,25 +2,35 @@ module.exports = function (RED) {
 
     function makeMatcher(filter, fallbackExact) {
         if (filter && typeof filter === "string" && filter.length) {
+            // regex: /.../
             if (filter.startsWith("/") && filter.endsWith("/")) {
                 try { const re = new RegExp(filter.slice(1, -1)); return t => typeof t === "string" && re.test(t); }
                 catch { return () => false; }
             }
+            // wildcard: *
             if (filter.includes("*")) {
                 const esc = s => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
                 const re = new RegExp("^" + esc(filter).replace(/\*/g, ".*") + "$");
                 return t => typeof t === "string" && re.test(t);
             }
-            return t => t === filter; // exact
+            // exact
+            return t => t === filter;
         }
-        return t => t === fallbackExact; // fallback to card.type
+        // no filter -> exact match on type
+        return t => t === fallbackExact;
     }
 
     function BK9100Node(config) {
         RED.nodes.createNode(this, config);
         const node = this;
 
-        const cards = Array.isArray(config.cards) ? config.cards : [];
+        // cards might arrive as string if editor serialized oddly
+        let cards = config.cards;
+        if (typeof cards === "string") {
+            try { cards = JSON.parse(cards); } catch { cards = []; }
+        }
+        if (!Array.isArray(cards)) cards = [];
+
         const routes = cards.map(c => ({
             type:  c.type  || "",
             label: c.label || "",
@@ -32,8 +42,8 @@ module.exports = function (RED) {
 
         node.on('input', function (msg, send, done) {
             try {
-                const outs = new Array(routes.length).fill(null);
                 const topic = msg.topic;
+                const outs = new Array(Math.max(1, routes.length)).fill(null);
                 let hits = 0;
 
                 routes.forEach((r, i) => {
@@ -43,7 +53,7 @@ module.exports = function (RED) {
                 node.status({
                     fill: hits ? "green" : "yellow",
                     shape: hits ? "dot" : "ring",
-                    text: `${topic ?? '(no topic)'} → ${hits}/${routes.length}`
+                    text: `${topic ?? '(no topic)'} → ${hits}/${routes.length || 1}`
                 });
 
                 send(outs);
