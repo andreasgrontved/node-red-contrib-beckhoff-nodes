@@ -195,10 +195,13 @@ RED.nodes.registerType('BK9100', {
                 // Config container (for KL3208 specific settings)
                 const configContainer = $('<div class="card-config-container"></div>').appendTo(row);
 
-                // Show/hide KL3208 config based on type
+                // Show/hide card-specific config based on type
                 typeInput.on('change keyup', function() {
                     const type = $(this).val().trim().toUpperCase();
+                    
+                    // Handle KL3208
                     if (type === 'KL3208') {
+                        hideKL3468Config(configContainer);
                         if (!configContainer.find('.kl3208-config').length) {
                             showKL3208Config(configContainer, data?.config);
                         }
@@ -206,7 +209,9 @@ RED.nodes.registerType('BK9100', {
                         hideKL3208Config(configContainer);
                     }
                     
+                    // Handle KL3468
                     if (type === 'KL3468') {
+                        hideKL3208Config(configContainer);
                         if (!configContainer.find('.kl3468-config').length) {
                             showKL3468Config(configContainer, data?.config);
                         }
