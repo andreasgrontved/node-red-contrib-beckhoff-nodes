@@ -100,7 +100,7 @@ RED.nodes.registerType('BK9100', {
 
         // Generic config with poll rate
         function showGenericConfig(container, config, isOutput) {
-            const bgColor = isOutput ? '#ffe6e6' : '#f9f9f9';
+            const bgColor = '#f9f9f9';  // Same color for all cards
             const configDiv = $('<div class="generic-config" style="margin-top:8px;padding:8px;border:1px solid #ddd;border-radius:4px;background:' + bgColor + ';"></div>');
             
             const header = $('<div style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;"></div>');
