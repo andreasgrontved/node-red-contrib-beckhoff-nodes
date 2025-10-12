@@ -465,7 +465,7 @@ module.exports = function (RED) {
                 let targetChannel = null;
                 let value = null;
 
-                // Format 1: Topic-based (e.g., msg.topic = "KL2408/ch3" or "Outputs/ch5")
+                // Format 1: Topic-based (e.g., msg.topic = "KL2408/ch3" or "DO00/ch1")
                 if (msg.topic && typeof msg.topic === 'string') {
                     const parts = msg.topic.split('/');
                     if (parts.length === 2 && parts[1].startsWith('ch')) {
@@ -473,10 +473,10 @@ module.exports = function (RED) {
                         targetChannel = parseInt(parts[1].substring(2));
                         value = msg.payload;
 
-                        // Find card by type or label
+                        // Find card by filter first (custom topic), then label, then type
                         targetCard = routes.find(r => 
                             r.direction === 'output' && 
-                            (r.type === cardIdentifier || r.label === cardIdentifier || r.filter === cardIdentifier)
+                            (r.filter === cardIdentifier || r.label === cardIdentifier || r.type === cardIdentifier)
                         );
                     }
                 }
@@ -488,13 +488,13 @@ module.exports = function (RED) {
                     value = msg.payload.value;
 
                     if (cardIdentifier !== undefined && targetChannel !== undefined) {
-                        // Find by label, type, filter, or index
+                        // Find by filter, label, type, or index
                         if (typeof cardIdentifier === 'number') {
                             targetCard = routes.filter(r => r.direction === 'output')[cardIdentifier];
                         } else {
                             targetCard = routes.find(r => 
                                 r.direction === 'output' && 
-                                (r.type === cardIdentifier || r.label === cardIdentifier || r.filter === cardIdentifier)
+                                (r.filter === cardIdentifier || r.label === cardIdentifier || r.type === cardIdentifier)
                             );
                         }
                     }
@@ -502,7 +502,7 @@ module.exports = function (RED) {
 
                 // Validate
                 if (!targetCard) {
-                    node.warn("Could not find output card. Use topic like 'KL2408/ch3' or payload {card:'label', channel:3, value:true}");
+                    node.warn("Could not find output card. Use topic like 'KL2408/ch3' or 'DO00/ch1' (if filter set) or payload {card:'label', channel:3, value:true}");
                     return;
                 }
 
@@ -511,19 +511,31 @@ module.exports = function (RED) {
                     return;
                 }
 
-                // Convert value to boolean
-                const boolValue = Boolean(value);
+                // Convert value to 0 or 1 for Modbus (accepts boolean, number, or string)
+                let coilValue;
+                if (typeof value === 'boolean') {
+                    coilValue = value ? 1 : 0;
+                } else if (typeof value === 'number') {
+                    coilValue = value ? 1 : 0;
+                } else if (typeof value === 'string') {
+                    const lower = value.toLowerCase();
+                    coilValue = (lower === 'true' || lower === '1' || lower === 'on') ? 1 : 0;
+                } else {
+                    coilValue = value ? 1 : 0;
+                }
 
                 // Calculate actual Modbus address
                 const modbusAddress = targetCard.startAddress + (targetChannel - 1);
 
-                // Write to Modbus
-                await client.writeSingleCoil(modbusAddress, boolValue);
+                // Write to Modbus (writeSingleCoil expects 0 or 1)
+                await client.writeSingleCoil(modbusAddress, coilValue);
                 
-                node.log(`Wrote ${boolValue} to ${targetCard.type} (${targetCard.label}) channel ${targetChannel}`);
+                const cardName = targetCard.filter || targetCard.label || targetCard.type;
+                node.log(`Wrote ${coilValue} to ${cardName} channel ${targetChannel} (address ${modbusAddress})`);
 
             } catch (err) {
                 node.error("Error writing output: " + err.message);
+                node.error(err.stack);
             }
         });
 
