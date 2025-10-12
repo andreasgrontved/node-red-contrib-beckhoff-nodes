@@ -8,11 +8,9 @@ module.exports = function (RED) {
         'KL1804': { size: 4, fc: 'readCoils', channels: 4, direction: 'input' },
         'KL1808': { size: 8, fc: 'readCoils', channels: 8, direction: 'input' },
         
-        // Digital Outputs (FC5)
+        // Digital Outputs (FC5 - Write Single Coil)
         'KL2404': { size: 4, fc: 'writeSingleCoil', channels: 4, direction: 'output' },
         'KL2408': { size: 8, fc: 'writeSingleCoil', channels: 8, direction: 'output' },
-        'KL2414': { size: 14, fc: 'writeSingleCoil', channels: 14, direction: 'output' },
-        'KL2424': { size: 24, fc: 'writeSingleCoil', channels: 24, direction: 'output' },
         
         // Analog Inputs (FC4)
         'KL3204': { size: 8, fc: 'readInputRegisters', channels: 4, direction: 'input' },
@@ -45,8 +43,6 @@ module.exports = function (RED) {
                 rawValue: rawValue
             };
             channels.push(channelData);
-            
-            // Add shortcut access: msg.payload.ch1, msg.payload.ch2, etc.
             result['ch' + (ch + 1)] = channelData;
         }
         
@@ -55,7 +51,7 @@ module.exports = function (RED) {
 
     function convertKL3208Data(rawArray, channelConfigs) {
         const expectedSize = rawArray.length;
-        const numChannels = expectedSize / 2; // 8 addresses = 4 channels, 16 addresses = 8 channels
+        const numChannels = expectedSize / 2;
         
         if (!Array.isArray(rawArray) || (expectedSize !== 8 && expectedSize !== 16)) {
             return { error: `Expected 8 or 16 element array from Modbus, got ${rawArray?.length}` };
@@ -73,22 +69,18 @@ module.exports = function (RED) {
             
             const sensorType = channelConfigs?.[ch] || 'pt1000';
             
-            // Convert signed 16-bit integer
             if (rawValue > 32767) {
                 rawValue = rawValue - 65536;
             }
             
-            // Raw value is in hundredths of a degree (divide by 100)
             let celsius, fahrenheit, unit, resistance;
             
             if (sensorType.startsWith('res_')) {
-                // Resistance measurement (in hundredths of ohms)
                 resistance = rawValue / 100;
                 celsius = null;
                 fahrenheit = null;
                 unit = 'Ω';
             } else {
-                // Temperature measurement (in hundredths of degrees)
                 celsius = rawValue / 100;
                 fahrenheit = (celsius * 9/5) + 32;
                 unit = '°C / °F';
@@ -116,8 +108,6 @@ module.exports = function (RED) {
             }
             
             channels.push(channelData);
-            
-            // Add shortcut access: msg.payload.ch1, msg.payload.ch2, etc.
             result['ch' + (ch + 1)] = channelData;
         }
         
@@ -126,7 +116,7 @@ module.exports = function (RED) {
 
     function convertKL3468Data(rawArray, channelConfigs) {
         const expectedSize = rawArray.length;
-        const numChannels = expectedSize / 2; // 8 addresses = 4 channels, 16 addresses = 8 channels
+        const numChannels = expectedSize / 2;
         
         if (!Array.isArray(rawArray) || (expectedSize !== 8 && expectedSize !== 16)) {
             return { error: `Expected 8 or 16 element array from Modbus, got ${rawArray?.length}` };
@@ -146,15 +136,12 @@ module.exports = function (RED) {
             const range = config.range || '0-10';
             const manufacturer = config.manufacturer || 'generic';
             
-            // Convert signed 16-bit integer
             if (rawValue > 32767) {
                 rawValue = rawValue - 65536;
             }
             
-            // Convert raw value to voltage (32767 = 10V)
             const voltage = (rawValue / 32767) * 10;
             
-            // Determine range parameters
             let minV, maxV, adaptationRaw;
             switch(range) {
                 case '0.5-10':
@@ -167,13 +154,12 @@ module.exports = function (RED) {
                     maxV = 10;
                     adaptationRaw = null;
                     break;
-                default: // '0-10'
+                default:
                     minV = 0;
                     maxV = 10;
                     adaptationRaw = null;
             }
             
-            // Calculate percentage (0-100%)
             let percentage;
             if (voltage < minV) {
                 percentage = 0;
@@ -183,7 +169,6 @@ module.exports = function (RED) {
                 percentage = ((voltage - minV) / (maxV - minV)) * 100;
             }
             
-            // Build channel data
             const channelData = {
                 channel: ch + 1,
                 state,
@@ -194,15 +179,12 @@ module.exports = function (RED) {
                 manufacturer
             };
             
-            // Only include adaptationMode for Belimo with 0.5-10V range
             if (manufacturer === 'belimo' && range === '0.5-10') {
                 const adaptationMode = Math.abs(rawValue - adaptationRaw) < 10;
                 channelData.adaptationMode = adaptationMode;
             }
             
             channels.push(channelData);
-            
-            // Add shortcut access: msg.payload.ch1, msg.payload.ch2, etc.
             result['ch' + (ch + 1)] = channelData;
         }
         
@@ -211,21 +193,21 @@ module.exports = function (RED) {
 
     function makeMatcher(filter, fallbackExact) {
         if (filter && typeof filter === "string" && filter.length) {
-            // regex: /.../
             if (filter.startsWith("/") && filter.endsWith("/")) {
-                try { const re = new RegExp(filter.slice(1, -1)); return t => typeof t === "string" && re.test(t); }
-                catch { return () => false; }
+                try { 
+                    const re = new RegExp(filter.slice(1, -1)); 
+                    return t => typeof t === "string" && re.test(t); 
+                } catch { 
+                    return () => false; 
+                }
             }
-            // wildcard: *
             if (filter.includes("*")) {
                 const esc = s => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
                 const re = new RegExp("^" + esc(filter).replace(/\*/g, ".*") + "$");
                 return t => typeof t === "string" && re.test(t);
             }
-            // exact
             return t => t === filter;
         }
-        // no filter -> exact match on type
         return t => t === fallbackExact;
     }
 
@@ -240,10 +222,10 @@ module.exports = function (RED) {
         if (!Array.isArray(cards)) cards = [];
 
         // Calculate address offsets for each card
-        // Important: FC2 (digital) and FC4 (analog) have separate address spaces
         const routes = [];
-        let digitalAddress = 0;  // For FC2 (KL1808)
-        let analogAddress = 0;   // For FC4 (KL3208, KL3468)
+        let digitalInputAddress = 0;   // For FC2 (digital inputs)
+        let digitalOutputAddress = 0;  // For FC5 (digital outputs)
+        let analogAddress = 0;          // For FC4 (analog inputs)
         
         cards.forEach(c => {
             const type = (c.type || "").toUpperCase();
@@ -252,10 +234,13 @@ module.exports = function (RED) {
             if (cardInfo) {
                 let startAddress;
                 
-                // Separate address spaces for digital vs analog
+                // Separate address spaces for different I/O types
                 if (cardInfo.fc === 'readCoils') {
-                    startAddress = digitalAddress;
-                    digitalAddress += cardInfo.size;
+                    startAddress = digitalInputAddress;
+                    digitalInputAddress += cardInfo.size;
+                } else if (cardInfo.fc === 'writeSingleCoil') {
+                    startAddress = digitalOutputAddress;
+                    digitalOutputAddress += cardInfo.size;
                 } else {
                     startAddress = analogAddress;
                     analogAddress += cardInfo.size;
@@ -269,7 +254,9 @@ module.exports = function (RED) {
                     pollRate: c.pollRate || null,
                     startAddress: startAddress,
                     size: cardInfo.size,
+                    channels: cardInfo.channels,
                     functionCode: cardInfo.fc,
+                    direction: cardInfo.direction,
                     match: makeMatcher(c.filter || "", c.type || ""),
                     lastPoll: 0
                 });
@@ -287,11 +274,10 @@ module.exports = function (RED) {
         let pollTimer = null;
         let reconnectTimer = null;
 
-        // Log card configuration for debugging
-        node.log(`Configured ${routes.length} cards with poll rates:`);
+        node.log(`Configured ${routes.length} cards`);
         routes.forEach((r, i) => {
             const rate = r.pollRate || pollInterval;
-            node.log(`  Card ${i+1} (${r.type}): ${rate}ms`);
+            node.log(`  Card ${i+1} (${r.type}): ${r.direction}, ${rate}ms`);
         });
 
         node.status({ fill: "grey", shape: "ring", text: "connecting..." });
@@ -324,7 +310,6 @@ module.exports = function (RED) {
                 socket.on('close', function() {
                     node.status({ fill: "yellow", shape: "ring", text: "disconnected" });
                     stopPolling();
-                    // Attempt reconnect after 5 seconds
                     if (!reconnectTimer) {
                         reconnectTimer = setTimeout(connect, 5000);
                     }
@@ -338,7 +323,7 @@ module.exports = function (RED) {
             }
         }
 
-        // Poll all cards
+        // Poll all input cards
         async function pollCards() {
             if (!client || !socket || socket.destroyed) {
                 return;
@@ -350,30 +335,31 @@ module.exports = function (RED) {
             for (let i = 0; i < routes.length; i++) {
                 const route = routes[i];
                 
+                // Skip output cards (they don't get polled)
+                if (route.direction === 'output') {
+                    continue;
+                }
+                
                 if (!route.size) {
                     continue;
                 }
 
-                // Check if this card needs polling based on its individual rate
                 const cardPollRate = route.pollRate || pollInterval;
                 if (now - route.lastPoll < cardPollRate) {
-                    continue; // Skip this card, not time yet
+                    continue;
                 }
 
                 try {
                     let response;
                     let data;
                     
-                    // Use appropriate function code based on card type
                     if (route.functionCode === 'readCoils') {
-                        // FC2 for digital inputs (KL1808)
                         response = await client.readDiscreteInputs(
                             route.startAddress, 
                             route.size
                         );
                         data = response.response._body._valuesAsArray;
                     } else {
-                        // FC4 for analog inputs (KL3208, KL3468)
                         response = await client.readInputRegisters(
                             route.startAddress, 
                             route.size
@@ -381,7 +367,6 @@ module.exports = function (RED) {
                         data = response.response._body._valuesAsArray;
                     }
                     
-                    // Process based on card type
                     let payload;
                     const cardType = route.type;
                     
@@ -401,16 +386,12 @@ module.exports = function (RED) {
                             node.warn(`${cardType} conversion error: ${payload.error}`);
                         }
                     } else {
-                        // Unknown card type - output raw data with warning
                         node.warn(`Unknown card type: ${cardType} - outputting raw data`);
                         payload = data;
                     }
                     
-                    // Send individual messages for each channel from this output
                     if (payload.channels && Array.isArray(payload.channels)) {
-                        // Create array of messages, one per channel
                         const channelMessages = payload.channels.map(ch => {
-                            // Use custom topic filter if provided, otherwise default to CardType/chX
                             const baseTopic = route.filter || route.type;
                             const msg = {
                                 topic: `${baseTopic}/ch${ch.channel}`,
@@ -421,21 +402,19 @@ module.exports = function (RED) {
                             return msg;
                         });
                         
-                        // Send all channel messages from this card's output
                         channelMessages.forEach(msg => {
                             outs[i] = msg;
                             node.send(outs);
                             outs[i] = null;
                         });
                     } else {
-                        // Error or unknown format - send as single message
                         outs[i] = {
                             topic: route.type,
                             payload: payload
                         };
                     }
                     
-                    route.lastPoll = now; // Update last poll time
+                    route.lastPoll = now;
                     
                 } catch (err) {
                     node.warn(`Error reading ${route.type} at address ${route.startAddress}: ${err.message}`);
@@ -445,28 +424,25 @@ module.exports = function (RED) {
                     };
                 }
             }
-
-            // Send to all outputs (null for cards that weren't polled this time)
-            // Note: Individual channel messages are already sent in the loop above
         }
 
         function startPolling() {
             if (pollTimer) clearInterval(pollTimer);
             
-            // Find the fastest poll rate among all cards (use global as default)
             let fastestRate = pollInterval;
             routes.forEach(r => {
-                const cardRate = r.pollRate || pollInterval;
-                if (cardRate < fastestRate) {
-                    fastestRate = cardRate;
+                if (r.direction === 'input') {
+                    const cardRate = r.pollRate || pollInterval;
+                    if (cardRate < fastestRate) {
+                        fastestRate = cardRate;
+                    }
                 }
             });
             
-            // Minimum poll rate is 50ms
             fastestRate = Math.max(50, fastestRate);
             
             pollTimer = setInterval(pollCards, fastestRate);
-            pollCards(); // Poll immediately
+            pollCards();
         }
 
         function stopPolling() {
@@ -475,6 +451,81 @@ module.exports = function (RED) {
                 pollTimer = null;
             }
         }
+
+        // Handle incoming messages to write outputs
+        node.on('input', async function(msg) {
+            if (!client || !socket || socket.destroyed) {
+                node.warn("Cannot write output - not connected to Modbus");
+                return;
+            }
+
+            try {
+                // Support multiple message formats
+                let targetCard = null;
+                let targetChannel = null;
+                let value = null;
+
+                // Format 1: Topic-based (e.g., msg.topic = "KL2408/ch3" or "Outputs/ch5")
+                if (msg.topic && typeof msg.topic === 'string') {
+                    const parts = msg.topic.split('/');
+                    if (parts.length === 2 && parts[1].startsWith('ch')) {
+                        const cardIdentifier = parts[0];
+                        targetChannel = parseInt(parts[1].substring(2));
+                        value = msg.payload;
+
+                        // Find card by type or label
+                        targetCard = routes.find(r => 
+                            r.direction === 'output' && 
+                            (r.type === cardIdentifier || r.label === cardIdentifier || r.filter === cardIdentifier)
+                        );
+                    }
+                }
+
+                // Format 2: Payload object
+                if (!targetCard && typeof msg.payload === 'object' && msg.payload !== null) {
+                    const cardIdentifier = msg.payload.card;
+                    targetChannel = msg.payload.channel;
+                    value = msg.payload.value;
+
+                    if (cardIdentifier !== undefined && targetChannel !== undefined) {
+                        // Find by label, type, filter, or index
+                        if (typeof cardIdentifier === 'number') {
+                            targetCard = routes.filter(r => r.direction === 'output')[cardIdentifier];
+                        } else {
+                            targetCard = routes.find(r => 
+                                r.direction === 'output' && 
+                                (r.type === cardIdentifier || r.label === cardIdentifier || r.filter === cardIdentifier)
+                            );
+                        }
+                    }
+                }
+
+                // Validate
+                if (!targetCard) {
+                    node.warn("Could not find output card. Use topic like 'KL2408/ch3' or payload {card:'label', channel:3, value:true}");
+                    return;
+                }
+
+                if (targetChannel < 1 || targetChannel > targetCard.channels) {
+                    node.warn(`Invalid channel ${targetChannel} for ${targetCard.type} (valid: 1-${targetCard.channels})`);
+                    return;
+                }
+
+                // Convert value to boolean
+                const boolValue = Boolean(value);
+
+                // Calculate actual Modbus address
+                const modbusAddress = targetCard.startAddress + (targetChannel - 1);
+
+                // Write to Modbus
+                await client.writeSingleCoil(modbusAddress, boolValue);
+                
+                node.log(`Wrote ${boolValue} to ${targetCard.type} (${targetCard.label}) channel ${targetChannel}`);
+
+            } catch (err) {
+                node.error("Error writing output: " + err.message);
+            }
+        });
 
         // Start Modbus connection
         connect();

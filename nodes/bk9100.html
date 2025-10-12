@@ -15,7 +15,7 @@ RED.nodes.registerType('BK9100', {
         outputs: { value: 1 }
     },
 
-    inputs: 1,
+    inputs: 1,  // Accept messages for output control
     outputs: 1,
 
     label: function () { 
@@ -98,26 +98,42 @@ RED.nodes.registerType('BK9100', {
             return select;
         }
 
-        function showKL1808Config(container, config) {
-            const configDiv = $('<div class="kl1808-config" style="margin-top:8px;padding:8px;border:1px solid #ddd;border-radius:4px;background:#f9f9f9;"></div>');
+        // Generic config with poll rate
+        function showGenericConfig(container, config, isOutput) {
+            const bgColor = isOutput ? '#ffe6e6' : '#f9f9f9';
+            const configDiv = $('<div class="generic-config" style="margin-top:8px;padding:8px;border:1px solid #ddd;border-radius:4px;background:' + bgColor + ';"></div>');
             
             const header = $('<div style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;"></div>');
             const icon = $('<i class="fa fa-caret-right" style="transition:transform 0.2s;"></i>');
-            const title = $('<span style="font-weight:600;">Card Configuration</span>');
+            const title = $('<span style="font-weight:600;">Configuration</span>');
             header.append(icon, title);
+            
+            if (isOutput) {
+                const badge = $('<span style="background:#d9534f;color:white;padding:2px 6px;border-radius:3px;font-size:0.8em;margin-left:8px;">OUTPUT</span>');
+                header.append(badge);
+            }
+            
             configDiv.append(header);
             
             const content = $('<div class="config-content" style="display:none;margin-top:6px;"></div>');
             
-            const pollRow = $('<div style="display:flex;gap:6px;align-items:center;"></div>');
-            pollRow.append('<label style="font-weight:600;">Poll Rate (ms):</label>');
-            const pollInput = $('<input type="number" class="node-input-card-poll" style="width:120px;" placeholder="Use global" min="100" step="100">');
-            if (config && config.pollRate) {
-                pollInput.val(config.pollRate);
+            if (isOutput) {
+                const infoBox = $('<div style="background:#fff3cd;border:1px solid #ffc107;padding:8px;border-radius:4px;margin-bottom:8px;"></div>');
+                infoBox.append('<div style="font-weight:600;margin-bottom:4px;"><i class="fa fa-info-circle"></i> Control via messages:</div>');
+                infoBox.append('<div style="font-size:0.85em;font-family:monospace;margin-left:20px;line-height:1.4;">msg.topic = "KL2408/ch3"<br>msg.payload = true</div>');
+                infoBox.append('<div style="font-size:0.85em;margin-top:6px;margin-left:20px;">Use card type or label in topic</div>');
+                content.append(infoBox);
+            } else {
+                const pollRow = $('<div style="display:flex;gap:6px;align-items:center;"></div>');
+                pollRow.append('<label style="font-weight:600;">Poll Rate (ms):</label>');
+                const pollInput = $('<input type="number" class="node-input-card-poll" style="width:120px;" placeholder="Use global" min="100" step="100">');
+                if (config && config.pollRate) {
+                    pollInput.val(config.pollRate);
+                }
+                pollRow.append(pollInput);
+                pollRow.append('<span style="color:#666;font-size:0.9em;margin-left:8px;">Leave empty to use global</span>');
+                content.append(pollRow);
             }
-            pollRow.append(pollInput);
-            pollRow.append('<span style="color:#666;font-size:0.9em;margin-left:8px;">Leave empty to use global poll rate</span>');
-            content.append(pollRow);
             
             configDiv.append(content);
             
@@ -130,8 +146,8 @@ RED.nodes.registerType('BK9100', {
             container.append(configDiv);
         }
 
-        function hideKL1808Config(container) {
-            container.find('.kl1808-config').remove();
+        function hideGenericConfig(container) {
+            container.find('.generic-config').remove();
         }
 
         function showKL3208Config(container, config) {
@@ -139,7 +155,7 @@ RED.nodes.registerType('BK9100', {
             
             const header = $('<div style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;"></div>');
             const icon = $('<i class="fa fa-caret-right" style="transition:transform 0.2s;"></i>');
-            const title = $('<span style="font-weight:600;">Channel Configuration</span>');
+            const title = $('<span style="font-weight:600;">Configuration</span>');
             header.append(icon, title);
             configDiv.append(header);
             
@@ -164,7 +180,7 @@ RED.nodes.registerType('BK9100', {
                 pollInput.val(config.pollRate);
             }
             pollRow.append(pollInput);
-            pollRow.append('<span style="color:#666;font-size:0.9em;margin-left:8px;">Leave empty to use global poll rate</span>');
+            pollRow.append('<span style="color:#666;font-size:0.9em;margin-left:8px;">Leave empty to use global</span>');
             grid.append(pollRow);
             
             grid.attr('data-num-channels', numChannels);
@@ -188,7 +204,7 @@ RED.nodes.registerType('BK9100', {
             
             const header = $('<div style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;"></div>');
             const icon = $('<i class="fa fa-caret-right" style="transition:transform 0.2s;"></i>');
-            const title = $('<span style="font-weight:600;">Channel Configuration</span>');
+            const title = $('<span style="font-weight:600;">Configuration</span>');
             header.append(icon, title);
             configDiv.append(header);
             
@@ -222,7 +238,7 @@ RED.nodes.registerType('BK9100', {
                 pollInput.val(config.pollRate);
             }
             pollRow.append(pollInput);
-            pollRow.append('<span style="color:#666;font-size:0.9em;margin-left:8px;">Leave empty to use global poll rate</span>');
+            pollRow.append('<span style="color:#666;font-size:0.9em;margin-left:8px;">Leave empty to use global</span>');
             grid.append(pollRow);
             
             grid.attr('data-num-channels', numChannels);
@@ -257,7 +273,7 @@ RED.nodes.registerType('BK9100', {
                 const mainRow = $('<div style="display:flex;gap:6px;align-items:center;"></div>').appendTo(row);
 
                 const typeWrap = $('<div style="width:160px"></div>').appendTo(mainRow);
-                const typeInput = $('<input type="text" class="node-input-card-type" style="width:100%" placeholder="KL1804/08, KL3204/08, KL3464/68">').appendTo(typeWrap);
+                const typeInput = $('<input type="text" class="node-input-card-type" style="width:100%" placeholder="KL1804/08, KL2404/08, KL3204/08, KL3464/68">').appendTo(typeWrap);
 
                 const labelWrap = $('<div style="width:220px"></div>').appendTo(mainRow);
                 $('<input type="text" class="node-input-card-label" style="width:100%" placeholder="e.g. Inputs A">').appendTo(labelWrap);
@@ -270,41 +286,34 @@ RED.nodes.registerType('BK9100', {
                 typeInput.on('change keyup', function() {
                     const type = $(this).val().trim().toUpperCase();
                     
+                    // Clear all configs first
+                    hideGenericConfig(configContainer);
+                    hideKL3208Config(configContainer);
+                    hideKL3468Config(configContainer);
+                    
+                    // Digital Inputs
                     if (type === 'KL1804' || type === 'KL1808') {
-                        hideKL3208Config(configContainer);
-                        hideKL3468Config(configContainer);
-                        if (!configContainer.find('.kl1808-config').length) {
-                            const cfg = data && data.config ? data.config : {};
-                            showKL1808Config(configContainer, cfg);
-                        }
-                    } else {
-                        hideKL1808Config(configContainer);
+                        const cfg = data && data.config ? data.config : {};
+                        showGenericConfig(configContainer, cfg, false);
                     }
-                    
-                    if (type === 'KL3204' || type === 'KL3208') {
-                        hideKL1808Config(configContainer);
-                        hideKL3468Config(configContainer);
-                        if (!configContainer.find('.kl3208-config').length) {
-                            const numChannels = type === 'KL3204' ? 4 : 8;
-                            const cfg = data && data.config ? data.config : {};
-                            cfg.numChannels = numChannels;
-                            showKL3208Config(configContainer, cfg);
-                        }
-                    } else {
-                        hideKL3208Config(configContainer);
+                    // Digital Outputs
+                    else if (type === 'KL2404' || type === 'KL2408') {
+                        const cfg = data && data.config ? data.config : {};
+                        showGenericConfig(configContainer, cfg, true);
                     }
-                    
-                    if (type === 'KL3464' || type === 'KL3468') {
-                        hideKL1808Config(configContainer);
-                        hideKL3208Config(configContainer);
-                        if (!configContainer.find('.kl3468-config').length) {
-                            const numChannels = type === 'KL3464' ? 4 : 8;
-                            const cfg = data && data.config ? data.config : {};
-                            cfg.numChannels = numChannels;
-                            showKL3468Config(configContainer, cfg);
-                        }
-                    } else {
-                        hideKL3468Config(configContainer);
+                    // Analog Temperature Inputs
+                    else if (type === 'KL3204' || type === 'KL3208') {
+                        const numChannels = type === 'KL3204' ? 4 : 8;
+                        const cfg = data && data.config ? data.config : {};
+                        cfg.numChannels = numChannels;
+                        showKL3208Config(configContainer, cfg);
+                    }
+                    // Analog Voltage Inputs
+                    else if (type === 'KL3464' || type === 'KL3468') {
+                        const numChannels = type === 'KL3464' ? 4 : 8;
+                        const cfg = data && data.config ? data.config : {};
+                        cfg.numChannels = numChannels;
+                        showKL3468Config(configContainer, cfg);
                     }
                 });
 
@@ -317,7 +326,10 @@ RED.nodes.registerType('BK9100', {
                     const pollRateValue = data.pollRate || null;
                     
                     if (cardType === 'KL1804' || cardType === 'KL1808') {
-                        showKL1808Config(configContainer, { pollRate: pollRateValue });
+                        showGenericConfig(configContainer, { pollRate: pollRateValue }, false);
+                    }
+                    else if (cardType === 'KL2404' || cardType === 'KL2408') {
+                        showGenericConfig(configContainer, { pollRate: pollRateValue }, true);
                     }
                     else if (cardType === 'KL3204' || cardType === 'KL3208') {
                         const numChannels = cardType === 'KL3204' ? 4 : 8;
@@ -435,20 +447,10 @@ RED.nodes.registerType('BK9100', {
     <div class="form-row">
         <label for="node-input-pollInterval"><i class="fa fa-clock-o"></i> Poll Rate</label>
         <input type="number" id="node-input-pollInterval" placeholder="1000" style="width:100px">
-        <span style="margin-left:5px">ms</span>
+        <span style="margin-left:5px">ms (for inputs only)</span>
     </div>
 
     <hr style="margin: 15px 0;">
-
-    <div class="form-tips" style="margin-top:8px;margin-bottom:12px;">
-        <b>Auto-addressing:</b> Cards are polled in order. Addresses auto-calculate based on card position 
-        (KL1804=4, KL1808=8, KL3204/KL3464=8, KL3208/KL3468=16 addresses). 
-        Reorder cards to match physical BK9100 configuration.
-        <br><b>Poll Rate:</b> Set individual poll rates per card (in milliseconds). Leave empty to use global poll rate. 
-        Example: Digital inputs=100ms, Temperature=5000ms.
-        <br><b>Temperature cards (KL3204/KL3208):</b> Configure sensor types for each channel.
-        <br><b>Voltage cards (KL3464/KL3468):</b> Configure voltage range and manufacturer for each channel.
-    </div>
 
     <div id="bk-cards-header"></div>
     <div class="form-row"><div id="bk-cards"></div></div>
@@ -456,10 +458,21 @@ RED.nodes.registerType('BK9100', {
 
 <script type="text/x-red" data-help-name="BK9100">
     <p>Polls Beckhoff BK9100 bus coupler via Modbus TCP and routes data to outputs based on card configuration.</p>
+    
+    <h3>Supported Cards</h3>
     <p><b>KL1804/KL1808:</b> Digital inputs (4 or 8 channels), outputs boolean values per channel.</p>
-    <p><b>KL3204/KL3208:</b> Analog temperature inputs (4 or 8 channels). Configure the sensor type for each channel. 
-       The node converts raw Modbus data to temperature readings in both Celsius and Fahrenheit.</p>
-    <p><b>KL3464/KL3468:</b> Analog voltage inputs 0-10V (4 or 8 channels). Configure the voltage range and manufacturer 
-       for each channel. The node converts to voltage and percentage (0-100%). Supports Belimo 
-       adaptation mode detection.</p>
+    <p><b>KL2404/KL2408:</b> Digital outputs (4 or 8 channels). Control via input messages.</p>
+    <p><b>KL3204/KL3208:</b> Analog temperature inputs (4 or 8 channels). Configure the sensor type for each channel.</p>
+    <p><b>KL3464/KL3468:</b> Analog voltage inputs 0-10V (4 or 8 channels). Configure the voltage range and manufacturer.</p>
+    
+    <h3>Controlling Outputs</h3>
+    <p>Send messages to control digital outputs (KL2404/KL2408):</p>
+    <pre>msg.topic = "KL2408/ch3"  // or use card label
+msg.payload = true         // true = ON, false = OFF</pre>
+    
+    <p>Examples:</p>
+    <ul>
+        <li><code>msg.topic = "KL2408/ch1"</code> - By card type</li>
+        <li><code>msg.topic = "Outputs/ch5"</code> - By card label</li>
+    </ul>
 </script>
