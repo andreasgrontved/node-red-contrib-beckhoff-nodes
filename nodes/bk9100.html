@@ -523,18 +523,6 @@ RED.nodes.registerType('BK9100', {
     <p><b>KL3204/KL3208:</b> Analog temperature inputs (4 or 8 channels). Configure the sensor type for each channel.</p>
     <p><b>KL3464/KL3468:</b> Analog voltage inputs 0-10V (4 or 8 channels). Configure the voltage range and manufacturer.</p>
     
-    <h3>Controlling Outputs</h3>
-    <p>Send messages to control digital outputs (KL2404/KL2408):</p>
-    <pre>msg.topic = "KL2408/ch3"  // or use card label
-msg.payload = true         // true = ON, false = OFF</pre>
-    
-    <p>Examples:</p>
-    <ul>
-        <li><code>msg.topic = "KL2408/ch1"</code> - By card type</li>
-        <li><code>msg.topic = "Outputs/ch5"</code> - By card label</li>
-        <li><code>msg.topic = "DO00/ch1"</code> - By custom topic filter</li>
-    </ul>
-    
     <h3>Output Configuration Options</h3>
     <ul>
         <li><b>Poll output states:</b> Enable to continuously read back the current state of outputs</li>
