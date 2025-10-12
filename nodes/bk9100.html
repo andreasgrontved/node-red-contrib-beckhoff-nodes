@@ -118,12 +118,6 @@ RED.nodes.registerType('BK9100', {
             const content = $('<div class="config-content" style="display:none;margin-top:6px;"></div>');
             
             if (isOutput) {
-                const infoBox = $('<div style="background:#fff3cd;border:1px solid #ffc107;padding:8px;border-radius:4px;margin-bottom:8px;"></div>');
-                infoBox.append('<div style="font-weight:600;margin-bottom:4px;"><i class="fa fa-info-circle"></i> Control via messages:</div>');
-                infoBox.append('<div style="font-size:0.85em;font-family:monospace;margin-left:20px;line-height:1.4;">msg.topic = "KL2408/ch3"<br>msg.payload = true</div>');
-                infoBox.append('<div style="font-size:0.85em;margin-top:6px;margin-left:20px;">Use card type or label in topic</div>');
-                content.append(infoBox);
-                
                 // Poll outputs checkbox
                 const pollCheckRow = $('<div style="display:flex;gap:6px;align-items:center;margin-top:10px;"></div>');
                 const pollCheckbox = $('<input type="checkbox" class="node-input-poll-outputs" style="margin:0;width:auto;">');
