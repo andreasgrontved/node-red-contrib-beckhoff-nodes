@@ -26,17 +26,22 @@ module.exports = function (RED) {
         }
 
         const channels = [];
+        const result = { channels: channels };
         
         for (let ch = 0; ch < expectedSize; ch++) {
             const rawValue = rawArray[ch];
-            channels.push({
+            const channelData = {
                 channel: ch + 1,
                 value: rawValue ? true : false,
                 rawValue: rawValue
-            });
+            };
+            channels.push(channelData);
+            
+            // Add shortcut access: msg.payload.ch1, msg.payload.ch2, etc.
+            result['ch' + (ch + 1)] = channelData;
         }
         
-        return { channels };
+        return result;
     }
 
     function convertKL3208Data(rawArray, channelConfigs) {
@@ -48,6 +53,7 @@ module.exports = function (RED) {
         }
 
         const channels = [];
+        const result = { channels: channels };
         
         for (let ch = 0; ch < numChannels; ch++) {
             const stateIdx = ch * 2;
@@ -101,9 +107,12 @@ module.exports = function (RED) {
             }
             
             channels.push(channelData);
+            
+            // Add shortcut access: msg.payload.ch1, msg.payload.ch2, etc.
+            result['ch' + (ch + 1)] = channelData;
         }
         
-        return { channels };
+        return result;
     }
 
     function convertKL3468Data(rawArray, channelConfigs) {
@@ -115,6 +124,7 @@ module.exports = function (RED) {
         }
 
         const channels = [];
+        const result = { channels: channels };
         
         for (let ch = 0; ch < numChannels; ch++) {
             const stateIdx = ch * 2;
@@ -182,9 +192,12 @@ module.exports = function (RED) {
             }
             
             channels.push(channelData);
+            
+            // Add shortcut access: msg.payload.ch1, msg.payload.ch2, etc.
+            result['ch' + (ch + 1)] = channelData;
         }
         
-        return { channels };
+        return result;
     }
 
     function makeMatcher(filter, fallbackExact) {
