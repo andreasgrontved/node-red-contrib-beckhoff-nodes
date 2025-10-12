@@ -468,15 +468,18 @@ module.exports = function (RED) {
                 // Format 1: Topic-based (e.g., msg.topic = "KL2408/ch3" or "DO00/ch1")
                 if (msg.topic && typeof msg.topic === 'string') {
                     const parts = msg.topic.split('/');
-                    if (parts.length === 2 && parts[1].startsWith('ch')) {
+                    if (parts.length === 2 && parts[1].toLowerCase().startsWith('ch')) {
                         const cardIdentifier = parts[0];
                         targetChannel = parseInt(parts[1].substring(2));
                         value = msg.payload;
 
-                        // Find card by filter first (custom topic), then label, then type
+                        // Find card by filter first (custom topic), then label, then type (case-insensitive)
+                        const cardIdUpper = cardIdentifier.toUpperCase();
                         targetCard = routes.find(r => 
                             r.direction === 'output' && 
-                            (r.filter === cardIdentifier || r.label === cardIdentifier || r.type === cardIdentifier)
+                            (r.filter.toUpperCase() === cardIdUpper || 
+                             r.label.toUpperCase() === cardIdUpper || 
+                             r.type.toUpperCase() === cardIdUpper)
                         );
                     }
                 }
@@ -488,13 +491,16 @@ module.exports = function (RED) {
                     value = msg.payload.value;
 
                     if (cardIdentifier !== undefined && targetChannel !== undefined) {
-                        // Find by filter, label, type, or index
+                        // Find by filter, label, type, or index (case-insensitive)
                         if (typeof cardIdentifier === 'number') {
                             targetCard = routes.filter(r => r.direction === 'output')[cardIdentifier];
                         } else {
+                            const cardIdUpper = String(cardIdentifier).toUpperCase();
                             targetCard = routes.find(r => 
                                 r.direction === 'output' && 
-                                (r.filter === cardIdentifier || r.label === cardIdentifier || r.type === cardIdentifier)
+                                (r.filter.toUpperCase() === cardIdUpper || 
+                                 r.label.toUpperCase() === cardIdUpper || 
+                                 r.type.toUpperCase() === cardIdUpper)
                             );
                         }
                     }
