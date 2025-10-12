@@ -4,13 +4,13 @@ module.exports = function (RED) {
 
     // Card address sizes and function codes
     const CARD_INFO = {
-        // Digital Inputs (FC2)
-        'KL1804': { size: 4, fc: 'readCoils', channels: 4, direction: 'input' },
-        'KL1808': { size: 8, fc: 'readCoils', channels: 8, direction: 'input' },
+        // Digital Inputs (FC2 - Read Discrete Inputs)
+        'KL1804': { size: 4, fc: 'readDiscreteInputs', channels: 4, direction: 'input' },
+        'KL1808': { size: 8, fc: 'readDiscreteInputs', channels: 8, direction: 'input' },
         
-        // Digital Outputs (FC5 - Write Single Coil)
-        'KL2404': { size: 4, fc: 'writeSingleCoil', channels: 4, direction: 'output' },
-        'KL2408': { size: 8, fc: 'writeSingleCoil', channels: 8, direction: 'output' },
+        // Digital Outputs (FC5 - Write Single Coil, FC1 - Read Coils for reading back)
+        'KL2404': { size: 4, fc: 'writeSingleCoil', readFc: 'readCoils', channels: 4, direction: 'output' },
+        'KL2408': { size: 8, fc: 'writeSingleCoil', readFc: 'readCoils', channels: 8, direction: 'output' },
         
         // Analog Inputs (FC4)
         'KL3204': { size: 8, fc: 'readInputRegisters', channels: 4, direction: 'input' },

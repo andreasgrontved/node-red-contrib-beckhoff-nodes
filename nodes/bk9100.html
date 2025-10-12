@@ -123,6 +123,50 @@ RED.nodes.registerType('BK9100', {
                 infoBox.append('<div style="font-size:0.85em;font-family:monospace;margin-left:20px;line-height:1.4;">msg.topic = "KL2408/ch3"<br>msg.payload = true</div>');
                 infoBox.append('<div style="font-size:0.85em;margin-top:6px;margin-left:20px;">Use card type or label in topic</div>');
                 content.append(infoBox);
+                
+                // Poll outputs checkbox
+                const pollCheckRow = $('<div style="display:flex;gap:6px;align-items:center;margin-top:10px;"></div>');
+                const pollCheckbox = $('<input type="checkbox" class="node-input-poll-outputs" style="margin:0;width:auto;">');
+                if (config && config.pollOutputs) {
+                    pollCheckbox.prop('checked', true);
+                }
+                pollCheckRow.append(pollCheckbox);
+                pollCheckRow.append('<label style="margin:0;font-weight:600;">Poll output states</label>');
+                pollCheckRow.append('<span style="color:#666;font-size:0.85em;margin-left:8px;">(read back current output values)</span>');
+                content.append(pollCheckRow);
+                
+                // Poll rate (only shown when poll outputs is checked)
+                const pollRateRow = $('<div style="display:flex;gap:6px;align-items:center;margin-top:6px;margin-left:20px;"></div>');
+                pollRateRow.append('<label style="font-weight:600;">Poll Rate (ms):</label>');
+                const pollInput = $('<input type="number" class="node-input-card-poll" style="width:120px;" placeholder="Use global" min="100" step="100">');
+                if (config && config.pollRate) {
+                    pollInput.val(config.pollRate);
+                }
+                pollRateRow.append(pollInput);
+                content.append(pollRateRow);
+                
+                // Show/hide poll rate based on checkbox
+                function updatePollRateVisibility() {
+                    if (pollCheckbox.is(':checked')) {
+                        pollRateRow.show();
+                    } else {
+                        pollRateRow.hide();
+                    }
+                }
+                pollCheckbox.on('change', updatePollRateVisibility);
+                updatePollRateVisibility();
+                
+                // Read on write checkbox
+                const readOnWriteRow = $('<div style="display:flex;gap:6px;align-items:center;margin-top:6px;"></div>');
+                const readOnWriteCheckbox = $('<input type="checkbox" class="node-input-read-on-write" style="margin:0;width:auto;">');
+                if (config && config.readOnWrite !== false) {
+                    readOnWriteCheckbox.prop('checked', true);
+                }
+                readOnWriteRow.append(readOnWriteCheckbox);
+                readOnWriteRow.append('<label style="margin:0;font-weight:600;">Read back after write</label>');
+                readOnWriteRow.append('<span style="color:#666;font-size:0.85em;margin-left:8px;">(verify write and output state)</span>');
+                content.append(readOnWriteRow);
+                
             } else {
                 const pollRow = $('<div style="display:flex;gap:6px;align-items:center;"></div>');
                 pollRow.append('<label style="font-weight:600;">Poll Rate (ms):</label>');
@@ -324,12 +368,18 @@ RED.nodes.registerType('BK9100', {
                     
                     const cardType = data.type ? data.type.toUpperCase() : "";
                     const pollRateValue = data.pollRate || null;
+                    const pollOutputsValue = data.pollOutputs || false;
+                    const readOnWriteValue = data.readOnWrite !== false;
                     
                     if (cardType === 'KL1804' || cardType === 'KL1808') {
                         showGenericConfig(configContainer, { pollRate: pollRateValue }, false);
                     }
                     else if (cardType === 'KL2404' || cardType === 'KL2408') {
-                        showGenericConfig(configContainer, { pollRate: pollRateValue }, true);
+                        showGenericConfig(configContainer, { 
+                            pollRate: pollRateValue,
+                            pollOutputs: pollOutputsValue,
+                            readOnWrite: readOnWriteValue
+                        }, true);
                     }
                     else if (cardType === 'KL3204' || cardType === 'KL3208') {
                         const numChannels = cardType === 'KL3204' ? 4 : 8;
@@ -378,6 +428,8 @@ RED.nodes.registerType('BK9100', {
             const type = row.find(".node-input-card-type").val() || "";
             const pollRateInput = row.find(".node-input-card-poll").val();
             const pollRate = pollRateInput ? parseInt(pollRateInput) : null;
+            const pollOutputs = row.find(".node-input-poll-outputs").is(':checked');
+            const readOnWrite = row.find(".node-input-read-on-write").is(':checked');
             
             const card = {
                 type:   type,
@@ -385,6 +437,12 @@ RED.nodes.registerType('BK9100', {
                 pollRate: pollRate,
                 filter: row.find(".node-input-card-filter").val() || ""
             };
+            
+            // Add output-specific settings
+            if (type.toUpperCase() === 'KL2404' || type.toUpperCase() === 'KL2408') {
+                card.pollOutputs = pollOutputs;
+                card.readOnWrite = readOnWrite;
+            }
             
             if (type.toUpperCase() === 'KL3204' || type.toUpperCase() === 'KL3208') {
                 const channels = [];
@@ -461,7 +519,7 @@ RED.nodes.registerType('BK9100', {
     
     <h3>Supported Cards</h3>
     <p><b>KL1804/KL1808:</b> Digital inputs (4 or 8 channels), outputs boolean values per channel.</p>
-    <p><b>KL2404/KL2408:</b> Digital outputs (4 or 8 channels). Control via input messages.</p>
+    <p><b>KL2404/KL2408:</b> Digital outputs (4 or 8 channels). Control via input messages. Can optionally poll to read back current state.</p>
     <p><b>KL3204/KL3208:</b> Analog temperature inputs (4 or 8 channels). Configure the sensor type for each channel.</p>
     <p><b>KL3464/KL3468:</b> Analog voltage inputs 0-10V (4 or 8 channels). Configure the voltage range and manufacturer.</p>
     
@@ -474,5 +532,12 @@ msg.payload = true         // true = ON, false = OFF</pre>
     <ul>
         <li><code>msg.topic = "KL2408/ch1"</code> - By card type</li>
         <li><code>msg.topic = "Outputs/ch5"</code> - By card label</li>
+        <li><code>msg.topic = "DO00/ch1"</code> - By custom topic filter</li>
+    </ul>
+    
+    <h3>Output Configuration Options</h3>
+    <ul>
+        <li><b>Poll output states:</b> Enable to continuously read back the current state of outputs</li>
+        <li><b>Read back after write:</b> Automatically verify the write by reading the coil state immediately after writing</li>
     </ul>
 </script>
