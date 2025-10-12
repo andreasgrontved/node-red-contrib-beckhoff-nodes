@@ -252,10 +252,13 @@ module.exports = function (RED) {
                     filter: c.filter || "",
                     config: c.config || null,
                     pollRate: c.pollRate || null,
+                    pollOutputs: c.pollOutputs || false,  // New: enable polling for outputs
+                    readOnWrite: c.readOnWrite !== false,  // New: read back after writing (default true)
                     startAddress: startAddress,
                     size: cardInfo.size,
                     channels: cardInfo.channels,
                     functionCode: cardInfo.fc,
+                    readFunctionCode: cardInfo.readFc || null,
                     direction: cardInfo.direction,
                     match: makeMatcher(c.filter || "", c.type || ""),
                     lastPoll: 0
@@ -323,7 +326,7 @@ module.exports = function (RED) {
             }
         }
 
-        // Poll all input cards
+        // Poll all input cards (and optionally output cards if pollOutputs enabled)
         async function pollCards() {
             if (!client || !socket || socket.destroyed) {
                 return;
@@ -335,8 +338,8 @@ module.exports = function (RED) {
             for (let i = 0; i < routes.length; i++) {
                 const route = routes[i];
                 
-                // Skip output cards (they don't get polled)
-                if (route.direction === 'output') {
+                // Skip output cards unless pollOutputs is enabled
+                if (route.direction === 'output' && !route.pollOutputs) {
                     continue;
                 }
                 
@@ -353,13 +356,22 @@ module.exports = function (RED) {
                     let response;
                     let data;
                     
-                    if (route.functionCode === 'readCoils') {
+                    if (route.direction === 'output') {
+                        // Read output coils (FC1)
+                        response = await client.readCoils(
+                            route.startAddress, 
+                            route.size
+                        );
+                        data = response.response._body._valuesAsArray;
+                    } else if (route.functionCode === 'readDiscreteInputs') {
+                        // FC2 for digital inputs
                         response = await client.readDiscreteInputs(
                             route.startAddress, 
                             route.size
                         );
                         data = response.response._body._valuesAsArray;
                     } else {
+                        // FC4 for analog inputs
                         response = await client.readInputRegisters(
                             route.startAddress, 
                             route.size
@@ -370,7 +382,7 @@ module.exports = function (RED) {
                     let payload;
                     const cardType = route.type;
                     
-                    if (cardType === 'KL1804' || cardType === 'KL1808') {
+                    if (cardType === 'KL1804' || cardType === 'KL1808' || cardType === 'KL2404' || cardType === 'KL2408') {
                         payload = convertKL1808Data(data);
                         if (payload.error) {
                             node.warn(`${cardType} conversion error: ${payload.error}`);
@@ -392,7 +404,7 @@ module.exports = function (RED) {
                     
                     if (payload.channels && Array.isArray(payload.channels)) {
                         const channelMessages = payload.channels.map(ch => {
-                            const baseTopic = route.filter || route.type;
+                            const baseTopic = route.filter || route.label || route.type;
                             const msg = {
                                 topic: `${baseTopic}/ch${ch.channel}`,
                                 payload: ch,
@@ -409,9 +421,11 @@ module.exports = function (RED) {
                         });
                     } else {
                         outs[i] = {
-                            topic: route.type,
+                            topic: route.filter || route.label || route.type,
                             payload: payload
                         };
+                        node.send(outs);
+                        outs[i] = null;
                     }
                     
                     route.lastPoll = now;
@@ -431,7 +445,8 @@ module.exports = function (RED) {
             
             let fastestRate = pollInterval;
             routes.forEach(r => {
-                if (r.direction === 'input') {
+                // Include output cards with pollOutputs enabled
+                if (r.direction === 'input' || (r.direction === 'output' && r.pollOutputs)) {
                     const cardRate = r.pollRate || pollInterval;
                     if (cardRate < fastestRate) {
                         fastestRate = cardRate;
@@ -538,6 +553,34 @@ module.exports = function (RED) {
                 
                 const cardName = targetCard.filter || targetCard.label || targetCard.type;
                 node.log(`Wrote ${coilValue} to ${cardName} channel ${targetChannel} (address ${modbusAddress})`);
+
+                // Read back the coil state if readOnWrite is enabled
+                if (targetCard.readOnWrite) {
+                    try {
+                        const readback = await client.readCoils(modbusAddress, 1);
+                        const actualValue = readback.response._body._valuesAsArray[0];
+                        
+                        // Find output index for this card
+                        const outputIndex = routes.indexOf(targetCard);
+                        if (outputIndex >= 0) {
+                            const outs = new Array(routes.length).fill(null);
+                            const baseTopic = targetCard.filter || targetCard.type;
+                            outs[outputIndex] = {
+                                topic: `${baseTopic}/ch${targetChannel}`,
+                                payload: {
+                                    channel: targetChannel,
+                                    value: actualValue ? true : false,
+                                    rawValue: actualValue
+                                },
+                                cardType: targetCard.type,
+                                cardLabel: targetCard.label
+                            };
+                            node.send(outs);
+                        }
+                    } catch (readErr) {
+                        node.warn(`Could not read back output state: ${readErr.message}`);
+                    }
+                }
 
             } catch (err) {
                 node.error("Error writing output: " + err.message);
