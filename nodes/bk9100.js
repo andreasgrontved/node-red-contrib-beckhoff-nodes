@@ -397,10 +397,34 @@ module.exports = function (RED) {
                         payload = data;
                     }
                     
-                    outs[i] = {
-                        topic: route.type,
-                        payload: payload
-                    };
+                    // Send individual messages for each channel from this output
+                    if (payload.channels && Array.isArray(payload.channels)) {
+                        // Create array of messages, one per channel
+                        const channelMessages = payload.channels.map(ch => {
+                            // Use custom topic filter if provided, otherwise default to CardType/chX
+                            const baseTopic = route.filter || route.type;
+                            const msg = {
+                                topic: `${baseTopic}/ch${ch.channel}`,
+                                payload: ch,
+                                cardType: route.type,
+                                cardLabel: route.label
+                            };
+                            return msg;
+                        });
+                        
+                        // Send all channel messages from this card's output
+                        channelMessages.forEach(msg => {
+                            outs[i] = msg;
+                            node.send(outs);
+                            outs[i] = null;
+                        });
+                    } else {
+                        // Error or unknown format - send as single message
+                        outs[i] = {
+                            topic: route.type,
+                            payload: payload
+                        };
+                    }
                     
                     route.lastPoll = now; // Update last poll time
                     
@@ -414,7 +438,7 @@ module.exports = function (RED) {
             }
 
             // Send to all outputs (null for cards that weren't polled this time)
-            node.send(outs);
+            // Note: Individual channel messages are already sent in the loop above
         }
 
         function startPolling() {
