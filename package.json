@@ -1,9 +1,25 @@
 {
   "name": "node-red-contrib-beckhoff-nodes",
   "version": "0.0.1",
-  "description": "Custom Beckhoff nodes for Node-RED",
+  "description": "Custom Node-RED nodes for Beckhoff BK9100 bus couplers",
+  "author": "Andreas Grontved",
   "license": "MIT",
-  "keywords": ["node-red","beckhoff","bk9100","modbus"],
+  "keywords": [
+    "node-red",
+    "beckhoff",
+    "bk9100",
+    "modbus",
+    "automation",
+    "industrial"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/andreasgrontved/beckhoff-nodes.git"
+  },
+  "bugs": {
+    "url": "https://github.com/andreasgrontved/beckhoff-nodes/issues"
+  },
+  "homepage": "https://github.com/andreasgrontved/beckhoff-nodes#readme",
   "dependencies": {
     "jsmodbus": "^4.0.6"
   },
@@ -11,5 +27,8 @@
     "nodes": {
       "BK9100": "nodes/bk9100.js"
     }
+  },
+  "engines": {
+    "node": ">=14.0.0"
   }
 }
