@@ -24,6 +24,7 @@
     "jsmodbus": "^4.0.6"
   },
   "node-red": {
+    "version": ">=2.0.0",
     "nodes": {
       "BK9100": "nodes/bk9100.js"
     }
