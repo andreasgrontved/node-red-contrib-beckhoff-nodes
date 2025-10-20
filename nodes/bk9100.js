@@ -61,9 +61,9 @@ module.exports = function (RED) {
         const result = { channels: channels };
         
         for (let ch = 0; ch < numChannels; ch++) {
-            // FIXED: Data comes first (even indices), then state (odd indices)
-            const dataIdx = ch * 2;
-            const stateIdx = ch * 2 + 1;
+            // FIXED: State comes first (even indices), then data (odd indices)
+            const stateIdx = ch * 2;
+            const dataIdx = ch * 2 + 1;
             
             const state = rawArray[stateIdx];
             let rawValue = rawArray[dataIdx];
