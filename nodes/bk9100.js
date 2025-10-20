@@ -61,8 +61,9 @@ module.exports = function (RED) {
         const result = { channels: channels };
         
         for (let ch = 0; ch < numChannels; ch++) {
-            const stateIdx = ch * 2;
-            const dataIdx = ch * 2 + 1;
+            // FIXED: Data comes first (even indices), then state (odd indices)
+            const dataIdx = ch * 2;
+            const stateIdx = ch * 2 + 1;
             
             const state = rawArray[stateIdx];
             let rawValue = rawArray[dataIdx];
@@ -126,8 +127,9 @@ module.exports = function (RED) {
         const result = { channels: channels };
         
         for (let ch = 0; ch < numChannels; ch++) {
-            const stateIdx = ch * 2;
-            const dataIdx = ch * 2 + 1;
+            // FIXED: Data comes first (even indices), then state (odd indices)
+            const dataIdx = ch * 2;
+            const stateIdx = ch * 2 + 1;
             
             const state = rawArray[stateIdx];
             let rawValue = rawArray[dataIdx];
@@ -252,8 +254,8 @@ module.exports = function (RED) {
                     filter: c.filter || "",
                     config: c.config || null,
                     pollRate: c.pollRate || null,
-                    pollOutputs: c.pollOutputs || false,  // New: enable polling for outputs
-                    readOnWrite: c.readOnWrite !== false,  // New: read back after writing (default true)
+                    pollOutputs: c.pollOutputs || false,
+                    readOnWrite: c.readOnWrite !== false,
                     startAddress: startAddress,
                     size: cardInfo.size,
                     channels: cardInfo.channels,
