@@ -61,7 +61,7 @@ module.exports = function (RED) {
         const result = { channels: channels };
         
         for (let ch = 0; ch < numChannels; ch++) {
-            // FIXED: State comes first (even indices), then data (odd indices)
+            // State at even indices (0,2,4...), data at odd indices (1,3,5...)
             const stateIdx = ch * 2;
             const dataIdx = ch * 2 + 1;
             
@@ -127,9 +127,9 @@ module.exports = function (RED) {
         const result = { channels: channels };
         
         for (let ch = 0; ch < numChannels; ch++) {
-            // FIXED: Data comes first (even indices), then state (odd indices)
-            const dataIdx = ch * 2;
-            const stateIdx = ch * 2 + 1;
+            // State at even indices (0,2,4...), data at odd indices (1,3,5...)
+            const stateIdx = ch * 2;
+            const dataIdx = ch * 2 + 1;
             
             const state = rawArray[stateIdx];
             let rawValue = rawArray[dataIdx];
@@ -226,7 +226,7 @@ module.exports = function (RED) {
         // Calculate address offsets for each card
         const routes = [];
         let digitalInputAddress = 0;   // For FC2 (digital inputs)
-        let digitalOutputAddress = 0;  // For FC5 (digital outputs)
+        let digitalOutputAddress = 0;  // For FC5/FC1 (digital outputs)
         let analogAddress = 0;          // For FC4 (analog inputs)
         
         cards.forEach(c => {
@@ -237,13 +237,15 @@ module.exports = function (RED) {
                 let startAddress;
                 
                 // Separate address spaces for different I/O types
-                if (cardInfo.fc === 'readCoils') {
+                // FIXED: Check for 'readDiscreteInputs' (FC2) not 'readCoils'
+                if (cardInfo.fc === 'readDiscreteInputs') {
                     startAddress = digitalInputAddress;
                     digitalInputAddress += cardInfo.size;
                 } else if (cardInfo.fc === 'writeSingleCoil') {
                     startAddress = digitalOutputAddress;
                     digitalOutputAddress += cardInfo.size;
                 } else {
+                    // FC4 (readInputRegisters) - KL3208, KL3468, etc.
                     startAddress = analogAddress;
                     analogAddress += cardInfo.size;
                 }
@@ -282,7 +284,7 @@ module.exports = function (RED) {
         node.log(`Configured ${routes.length} cards`);
         routes.forEach((r, i) => {
             const rate = r.pollRate || pollInterval;
-            node.log(`  Card ${i+1} (${r.type}): ${r.direction}, ${rate}ms`);
+            node.log(`  Card ${i+1} (${r.type}): ${r.direction}, addr ${r.startAddress}, ${rate}ms`);
         });
 
         node.status({ fill: "grey", shape: "ring", text: "connecting..." });
